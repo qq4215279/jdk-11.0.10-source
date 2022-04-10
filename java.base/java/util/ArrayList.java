@@ -10,6 +10,13 @@ import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import jdk.internal.access.SharedSecrets;
 
+/** 
+ *
+ * @author liuzhen
+ * @date 2022/4/10 22:35 
+ * @param null 
+ * @return 
+ */
 public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
     private static final long serialVersionUID = 8683452581122892189L;
 

@@ -26,8 +26,13 @@ import java.util.stream.StreamSupport;
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 
-public final class String
-    implements java.io.Serializable, Comparable<String>, CharSequence {
+/**
+ *
+ * @author liuzhen
+ * @date 2022/4/10 22:34
+ * @return
+ */
+public final class String implements java.io.Serializable, Comparable<String>, CharSequence {
 
     /**⽤来存储字符串 */
     @Stable

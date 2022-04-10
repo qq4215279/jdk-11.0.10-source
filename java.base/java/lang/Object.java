@@ -5,8 +5,15 @@
 
 package java.lang;
 
+import jdk.internal.HotSpotIntrinsicCandidate;
 
-
+/** 
+ *
+ * @author liuzhen
+ * @date 2022/4/10 22:35 
+ * @param null 
+ * @return 
+ */
 public class Object {
 
     private static native void registerNatives();

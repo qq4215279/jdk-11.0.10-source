@@ -34,6 +34,13 @@ import static java.lang.String.COMPACT_STRINGS;
 import static java.lang.String.LATIN1;
 import static java.lang.String.UTF16;
 
+/** 
+ *
+ * @author liuzhen
+ * @date 2022/4/10 22:35 
+ * @param null 
+ * @return 
+ */
 public final class Integer extends Number implements Comparable<Integer> {
     @Native public static final int   MIN_VALUE = 0x80000000;
 

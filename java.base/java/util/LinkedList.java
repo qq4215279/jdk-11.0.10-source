@@ -10,6 +10,10 @@ import java.util.function.Consumer;
 /**
  * 和 ArrayList 集合⼀样，LinkedList 集合也实现了Cloneable接⼝和Serializable接⼝，分别⽤来⽀持克隆以及⽀持序列化。List 接⼝也不⽤多说，定义了⼀套 List 集合类型的⽅法规范。
  * 注意，相对于 ArrayList 集合，LinkedList 集合多实现了⼀个 Deque 接⼝，这是⼀个双向队列接⼝，双向队列就是两端都可以进⾏增加和删除操作。
+ * @author liuzhen
+ * @date 2022/4/10 22:35
+ * @param null
+ * @return
  */
 public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>, Deque<E>, Cloneable, java.io.Serializable {
     /** 链表元素（节点）的个数 */
