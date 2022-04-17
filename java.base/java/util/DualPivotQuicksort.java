@@ -1,87 +1,37 @@
 /*
  * Copyright (c) 2009, 2016, Oracle and/or its affiliates. All rights reserved.
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
  */
 
 package java.util;
 
 /**
- * This class implements the Dual-Pivot Quicksort algorithm by
- * Vladimir Yaroslavskiy, Jon Bentley, and Josh Bloch. The algorithm
- * offers O(n log(n)) performance on many data sets that cause other
- * quicksorts to degrade to quadratic performance, and is typically
- * faster than traditional (one-pivot) Quicksort implementations.
  *
- * All exposed methods are package-private, designed to be invoked
- * from public methods (in class Arrays) after performing any
- * necessary array bounds checks and expanding parameters into the
- * required forms.
- *
- * @author Vladimir Yaroslavskiy
- * @author Jon Bentley
- * @author Josh Bloch
- *
- * @version 2011.02.11 m765.827.12i:5\7pm
- * @since 1.7
+ * @author liuzhen
+ * @date 2022/4/11 19:14
+ * @param null
+ * @return
  */
 final class DualPivotQuicksort {
 
     /**
      * Prevents instantiation.
      */
-    private DualPivotQuicksort() {}
+    private DualPivotQuicksort() {
+    }
 
     /*
      * Tuning parameters.
      */
 
-    /**
-     * The maximum number of runs in merge sort.
-     */
     private static final int MAX_RUN_COUNT = 67;
 
-    /**
-     * If the length of an array to be sorted is less than this
-     * constant, Quicksort is used in preference to merge sort.
-     */
     private static final int QUICKSORT_THRESHOLD = 286;
 
-    /**
-     * If the length of an array to be sorted is less than this
-     * constant, insertion sort is used in preference to Quicksort.
-     */
     private static final int INSERTION_SORT_THRESHOLD = 47;
 
-    /**
-     * If the length of a byte array to be sorted is greater than this
-     * constant, counting sort is used in preference to insertion sort.
-     */
     private static final int COUNTING_SORT_THRESHOLD_FOR_BYTE = 29;
 
-    /**
-     * If the length of a short or char array to be sorted is greater
-     * than this constant, counting sort is used in preference to Quicksort.
-     */
     private static final int COUNTING_SORT_THRESHOLD_FOR_SHORT_OR_CHAR = 3200;
 
     /*
@@ -89,18 +39,18 @@ final class DualPivotQuicksort {
      */
 
     /**
-     * Sorts the specified range of the array using the given
-     * workspace array slice if possible for merging
      *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
+     * @author liuzhen
+     * @date 2022/4/11 19:15
+     * @param a
+     * @param left
+     * @param right
+     * @param work
+     * @param workBase
+     * @param workLen
+     * @return void
      */
-    static void sort(int[] a, int left, int right,
-                     int[] work, int workBase, int workLen) {
+    static void sort(int[] a, int left, int right, int[] work, int workBase, int workLen) {
         // Use Quicksort on small arrays
         if (right - left < QUICKSORT_THRESHOLD) {
             sort(a, left, right, true);
@@ -112,21 +62,27 @@ final class DualPivotQuicksort {
          * (ascending or descending sequence).
          */
         int[] run = new int[MAX_RUN_COUNT + 1];
-        int count = 0; run[0] = left;
+        int count = 0;
+        run[0] = left;
 
         // Check if the array is nearly sorted
         for (int k = left; k < right; run[count] = k) {
             // Equal items in the beginning of the sequence
             while (k < right && a[k] == a[k + 1])
                 k++;
-            if (k == right) break;  // Sequence finishes with equal items
+            if (k == right)
+                break;  // Sequence finishes with equal items
             if (a[k] < a[k + 1]) { // ascending
-                while (++k <= right && a[k - 1] <= a[k]);
+                while (++k <= right && a[k - 1] <= a[k])
+                    ;
             } else if (a[k] > a[k + 1]) { // descending
-                while (++k <= right && a[k - 1] >= a[k]);
+                while (++k <= right && a[k - 1] >= a[k])
+                    ;
                 // Transform into an ascending sequence
                 for (int lo = run[count] - 1, hi = k; ++lo < --hi; ) {
-                    int t = a[lo]; a[lo] = a[hi]; a[hi] = t;
+                    int t = a[lo];
+                    a[lo] = a[hi];
+                    a[hi] = t;
                 }
             }
 
@@ -170,7 +126,8 @@ final class DualPivotQuicksort {
 
         // Determine alternation base for merge
         byte odd = 0;
-        for (int n = 1; (n <<= 1) < count; odd ^= 1);
+        for (int n = 1; (n <<= 1) < count; odd ^= 1)
+            ;
 
         // Use or create temporary array b for merging
         int[] b;                 // temp array; alternates with a
@@ -206,23 +163,25 @@ final class DualPivotQuicksort {
                 run[++last] = hi;
             }
             if ((count & 1) != 0) {
-                for (int i = right, lo = run[count - 1]; --i >= lo;
-                    b[i + bo] = a[i + ao]
-                );
+                for (int i = right, lo = run[count - 1]; --i >= lo; b[i + bo] = a[i + ao])
+                    ;
                 run[++last] = right;
             }
-            int[] t = a; a = b; b = t;
-            int o = ao; ao = bo; bo = o;
+            int[] t = a;
+            a = b;
+            b = t;
+            int o = ao;
+            ao = bo;
+            bo = o;
         }
     }
 
     /**
-     * Sorts the specified range of the array by Dual-Pivot Quicksort.
      *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param leftmost indicates if this part is the leftmost in the range
+     * @param a
+     * @param left
+     * @param right
+     * @param leftmost
      */
     private static void sort(int[] a, int left, int right, boolean leftmost) {
         int length = right - left + 1;
@@ -267,7 +226,8 @@ final class DualPivotQuicksort {
                     int a1 = a[k], a2 = a[left];
 
                     if (a1 < a2) {
-                        a2 = a1; a1 = a[left];
+                        a2 = a1;
+                        a1 = a[left];
                     }
                     while (a1 < a[--k]) {
                         a[k + 2] = a[k];
@@ -306,26 +266,54 @@ final class DualPivotQuicksort {
         int e5 = e4 + seventh;
 
         // Sort these elements using insertion sort
-        if (a[e2] < a[e1]) { int t = a[e2]; a[e2] = a[e1]; a[e1] = t; }
-
-        if (a[e3] < a[e2]) { int t = a[e3]; a[e3] = a[e2]; a[e2] = t;
-            if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e2] < a[e1]) {
+            int t = a[e2];
+            a[e2] = a[e1];
+            a[e1] = t;
         }
-        if (a[e4] < a[e3]) { int t = a[e4]; a[e4] = a[e3]; a[e3] = t;
-            if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+
+        if (a[e3] < a[e2]) {
+            int t = a[e3];
+            a[e3] = a[e2];
+            a[e2] = t;
+            if (t < a[e1]) {
+                a[e2] = a[e1];
+                a[e1] = t;
             }
         }
-        if (a[e5] < a[e4]) { int t = a[e5]; a[e5] = a[e4]; a[e4] = t;
-            if (t < a[e3]) { a[e4] = a[e3]; a[e3] = t;
-                if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                    if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e4] < a[e3]) {
+            int t = a[e4];
+            a[e4] = a[e3];
+            a[e3] = t;
+            if (t < a[e2]) {
+                a[e3] = a[e2];
+                a[e2] = t;
+                if (t < a[e1]) {
+                    a[e2] = a[e1];
+                    a[e1] = t;
+                }
+            }
+        }
+        if (a[e5] < a[e4]) {
+            int t = a[e5];
+            a[e5] = a[e4];
+            a[e4] = t;
+            if (t < a[e3]) {
+                a[e4] = a[e3];
+                a[e3] = t;
+                if (t < a[e2]) {
+                    a[e3] = a[e2];
+                    a[e2] = t;
+                    if (t < a[e1]) {
+                        a[e2] = a[e1];
+                        a[e1] = t;
+                    }
                 }
             }
         }
 
         // Pointers
-        int less  = left;  // The index of the first element of center part
+        int less = left;  // The index of the first element of center part
         int great = right; // The index before the first element of right part
 
         if (a[e1] != a[e2] && a[e2] != a[e3] && a[e3] != a[e4] && a[e4] != a[e5]) {
@@ -349,8 +337,10 @@ final class DualPivotQuicksort {
             /*
              * Skip elements, which are less or greater than pivot values.
              */
-            while (a[++less] < pivot1);
-            while (a[--great] > pivot2);
+            while (a[++less] < pivot1)
+                ;
+            while (a[--great] > pivot2)
+                ;
 
             /*
              * Partitioning:
@@ -405,8 +395,10 @@ final class DualPivotQuicksort {
             }
 
             // Swap pivots into their final positions
-            a[left]  = a[less  - 1]; a[less  - 1] = pivot1;
-            a[right] = a[great + 1]; a[great + 1] = pivot2;
+            a[left] = a[less - 1];
+            a[less - 1] = pivot1;
+            a[right] = a[great + 1];
+            a[great + 1] = pivot2;
 
             // Sort left and right parts recursively, excluding known pivots
             sort(a, left, less - 2, leftmost);
@@ -554,19 +546,7 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array using the given
-     * workspace array slice if possible for merging
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    static void sort(long[] a, int left, int right,
-                     long[] work, int workBase, int workLen) {
+    static void sort(long[] a, int left, int right, long[] work, int workBase, int workLen) {
         // Use Quicksort on small arrays
         if (right - left < QUICKSORT_THRESHOLD) {
             sort(a, left, right, true);
@@ -578,21 +558,27 @@ final class DualPivotQuicksort {
          * (ascending or descending sequence).
          */
         int[] run = new int[MAX_RUN_COUNT + 1];
-        int count = 0; run[0] = left;
+        int count = 0;
+        run[0] = left;
 
         // Check if the array is nearly sorted
         for (int k = left; k < right; run[count] = k) {
             // Equal items in the beginning of the sequence
             while (k < right && a[k] == a[k + 1])
                 k++;
-            if (k == right) break;  // Sequence finishes with equal items
+            if (k == right)
+                break;  // Sequence finishes with equal items
             if (a[k] < a[k + 1]) { // ascending
-                while (++k <= right && a[k - 1] <= a[k]);
+                while (++k <= right && a[k - 1] <= a[k])
+                    ;
             } else if (a[k] > a[k + 1]) { // descending
-                while (++k <= right && a[k - 1] >= a[k]);
+                while (++k <= right && a[k - 1] >= a[k])
+                    ;
                 // Transform into an ascending sequence
                 for (int lo = run[count] - 1, hi = k; ++lo < --hi; ) {
-                    long t = a[lo]; a[lo] = a[hi]; a[hi] = t;
+                    long t = a[lo];
+                    a[lo] = a[hi];
+                    a[hi] = t;
                 }
             }
 
@@ -636,7 +622,8 @@ final class DualPivotQuicksort {
 
         // Determine alternation base for merge
         byte odd = 0;
-        for (int n = 1; (n <<= 1) < count; odd ^= 1);
+        for (int n = 1; (n <<= 1) < count; odd ^= 1)
+            ;
 
         // Use or create temporary array b for merging
         long[] b;                 // temp array; alternates with a
@@ -672,24 +659,19 @@ final class DualPivotQuicksort {
                 run[++last] = hi;
             }
             if ((count & 1) != 0) {
-                for (int i = right, lo = run[count - 1]; --i >= lo;
-                    b[i + bo] = a[i + ao]
-                );
+                for (int i = right, lo = run[count - 1]; --i >= lo; b[i + bo] = a[i + ao])
+                    ;
                 run[++last] = right;
             }
-            long[] t = a; a = b; b = t;
-            int o = ao; ao = bo; bo = o;
+            long[] t = a;
+            a = b;
+            b = t;
+            int o = ao;
+            ao = bo;
+            bo = o;
         }
     }
 
-    /**
-     * Sorts the specified range of the array by Dual-Pivot Quicksort.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param leftmost indicates if this part is the leftmost in the range
-     */
     private static void sort(long[] a, int left, int right, boolean leftmost) {
         int length = right - left + 1;
 
@@ -733,7 +715,8 @@ final class DualPivotQuicksort {
                     long a1 = a[k], a2 = a[left];
 
                     if (a1 < a2) {
-                        a2 = a1; a1 = a[left];
+                        a2 = a1;
+                        a1 = a[left];
                     }
                     while (a1 < a[--k]) {
                         a[k + 2] = a[k];
@@ -772,26 +755,54 @@ final class DualPivotQuicksort {
         int e5 = e4 + seventh;
 
         // Sort these elements using insertion sort
-        if (a[e2] < a[e1]) { long t = a[e2]; a[e2] = a[e1]; a[e1] = t; }
-
-        if (a[e3] < a[e2]) { long t = a[e3]; a[e3] = a[e2]; a[e2] = t;
-            if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e2] < a[e1]) {
+            long t = a[e2];
+            a[e2] = a[e1];
+            a[e1] = t;
         }
-        if (a[e4] < a[e3]) { long t = a[e4]; a[e4] = a[e3]; a[e3] = t;
-            if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+
+        if (a[e3] < a[e2]) {
+            long t = a[e3];
+            a[e3] = a[e2];
+            a[e2] = t;
+            if (t < a[e1]) {
+                a[e2] = a[e1];
+                a[e1] = t;
             }
         }
-        if (a[e5] < a[e4]) { long t = a[e5]; a[e5] = a[e4]; a[e4] = t;
-            if (t < a[e3]) { a[e4] = a[e3]; a[e3] = t;
-                if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                    if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e4] < a[e3]) {
+            long t = a[e4];
+            a[e4] = a[e3];
+            a[e3] = t;
+            if (t < a[e2]) {
+                a[e3] = a[e2];
+                a[e2] = t;
+                if (t < a[e1]) {
+                    a[e2] = a[e1];
+                    a[e1] = t;
+                }
+            }
+        }
+        if (a[e5] < a[e4]) {
+            long t = a[e5];
+            a[e5] = a[e4];
+            a[e4] = t;
+            if (t < a[e3]) {
+                a[e4] = a[e3];
+                a[e3] = t;
+                if (t < a[e2]) {
+                    a[e3] = a[e2];
+                    a[e2] = t;
+                    if (t < a[e1]) {
+                        a[e2] = a[e1];
+                        a[e1] = t;
+                    }
                 }
             }
         }
 
         // Pointers
-        int less  = left;  // The index of the first element of center part
+        int less = left;  // The index of the first element of center part
         int great = right; // The index before the first element of right part
 
         if (a[e1] != a[e2] && a[e2] != a[e3] && a[e3] != a[e4] && a[e4] != a[e5]) {
@@ -815,8 +826,10 @@ final class DualPivotQuicksort {
             /*
              * Skip elements, which are less or greater than pivot values.
              */
-            while (a[++less] < pivot1);
-            while (a[--great] > pivot2);
+            while (a[++less] < pivot1)
+                ;
+            while (a[--great] > pivot2)
+                ;
 
             /*
              * Partitioning:
@@ -871,8 +884,10 @@ final class DualPivotQuicksort {
             }
 
             // Swap pivots into their final positions
-            a[left]  = a[less  - 1]; a[less  - 1] = pivot1;
-            a[right] = a[great + 1]; a[great + 1] = pivot2;
+            a[left] = a[less - 1];
+            a[less - 1] = pivot1;
+            a[right] = a[great + 1];
+            a[great + 1] = pivot2;
 
             // Sort left and right parts recursively, excluding known pivots
             sort(a, left, less - 2, leftmost);
@@ -1020,29 +1035,17 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array using the given
-     * workspace array slice if possible for merging
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    static void sort(short[] a, int left, int right,
-                     short[] work, int workBase, int workLen) {
+    static void sort(short[] a, int left, int right, short[] work, int workBase, int workLen) {
         // Use counting sort on large arrays
         if (right - left > COUNTING_SORT_THRESHOLD_FOR_SHORT_OR_CHAR) {
             int[] count = new int[NUM_SHORT_VALUES];
 
-            for (int i = left - 1; ++i <= right;
-                count[a[i] - Short.MIN_VALUE]++
-            );
+            for (int i = left - 1; ++i <= right; count[a[i] - Short.MIN_VALUE]++)
+                ;
             for (int i = NUM_SHORT_VALUES, k = right + 1; k > left; ) {
-                while (count[--i] == 0);
-                short value = (short) (i + Short.MIN_VALUE);
+                while (count[--i] == 0)
+                    ;
+                short value = (short)(i + Short.MIN_VALUE);
                 int s = count[i];
 
                 do {
@@ -1054,21 +1057,9 @@ final class DualPivotQuicksort {
         }
     }
 
-    /** The number of distinct short values. */
     private static final int NUM_SHORT_VALUES = 1 << 16;
 
-    /**
-     * Sorts the specified range of the array.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    private static void doSort(short[] a, int left, int right,
-                               short[] work, int workBase, int workLen) {
+    private static void doSort(short[] a, int left, int right, short[] work, int workBase, int workLen) {
         // Use Quicksort on small arrays
         if (right - left < QUICKSORT_THRESHOLD) {
             sort(a, left, right, true);
@@ -1080,21 +1071,27 @@ final class DualPivotQuicksort {
          * (ascending or descending sequence).
          */
         int[] run = new int[MAX_RUN_COUNT + 1];
-        int count = 0; run[0] = left;
+        int count = 0;
+        run[0] = left;
 
         // Check if the array is nearly sorted
         for (int k = left; k < right; run[count] = k) {
             // Equal items in the beginning of the sequence
             while (k < right && a[k] == a[k + 1])
                 k++;
-            if (k == right) break;  // Sequence finishes with equal items
+            if (k == right)
+                break;  // Sequence finishes with equal items
             if (a[k] < a[k + 1]) { // ascending
-                while (++k <= right && a[k - 1] <= a[k]);
+                while (++k <= right && a[k - 1] <= a[k])
+                    ;
             } else if (a[k] > a[k + 1]) { // descending
-                while (++k <= right && a[k - 1] >= a[k]);
+                while (++k <= right && a[k - 1] >= a[k])
+                    ;
                 // Transform into an ascending sequence
                 for (int lo = run[count] - 1, hi = k; ++lo < --hi; ) {
-                    short t = a[lo]; a[lo] = a[hi]; a[hi] = t;
+                    short t = a[lo];
+                    a[lo] = a[hi];
+                    a[hi] = t;
                 }
             }
 
@@ -1138,7 +1135,8 @@ final class DualPivotQuicksort {
 
         // Determine alternation base for merge
         byte odd = 0;
-        for (int n = 1; (n <<= 1) < count; odd ^= 1);
+        for (int n = 1; (n <<= 1) < count; odd ^= 1)
+            ;
 
         // Use or create temporary array b for merging
         short[] b;                 // temp array; alternates with a
@@ -1174,24 +1172,19 @@ final class DualPivotQuicksort {
                 run[++last] = hi;
             }
             if ((count & 1) != 0) {
-                for (int i = right, lo = run[count - 1]; --i >= lo;
-                    b[i + bo] = a[i + ao]
-                );
+                for (int i = right, lo = run[count - 1]; --i >= lo; b[i + bo] = a[i + ao])
+                    ;
                 run[++last] = right;
             }
-            short[] t = a; a = b; b = t;
-            int o = ao; ao = bo; bo = o;
+            short[] t = a;
+            a = b;
+            b = t;
+            int o = ao;
+            ao = bo;
+            bo = o;
         }
     }
 
-    /**
-     * Sorts the specified range of the array by Dual-Pivot Quicksort.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param leftmost indicates if this part is the leftmost in the range
-     */
     private static void sort(short[] a, int left, int right, boolean leftmost) {
         int length = right - left + 1;
 
@@ -1235,7 +1228,8 @@ final class DualPivotQuicksort {
                     short a1 = a[k], a2 = a[left];
 
                     if (a1 < a2) {
-                        a2 = a1; a1 = a[left];
+                        a2 = a1;
+                        a1 = a[left];
                     }
                     while (a1 < a[--k]) {
                         a[k + 2] = a[k];
@@ -1274,26 +1268,54 @@ final class DualPivotQuicksort {
         int e5 = e4 + seventh;
 
         // Sort these elements using insertion sort
-        if (a[e2] < a[e1]) { short t = a[e2]; a[e2] = a[e1]; a[e1] = t; }
-
-        if (a[e3] < a[e2]) { short t = a[e3]; a[e3] = a[e2]; a[e2] = t;
-            if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e2] < a[e1]) {
+            short t = a[e2];
+            a[e2] = a[e1];
+            a[e1] = t;
         }
-        if (a[e4] < a[e3]) { short t = a[e4]; a[e4] = a[e3]; a[e3] = t;
-            if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+
+        if (a[e3] < a[e2]) {
+            short t = a[e3];
+            a[e3] = a[e2];
+            a[e2] = t;
+            if (t < a[e1]) {
+                a[e2] = a[e1];
+                a[e1] = t;
             }
         }
-        if (a[e5] < a[e4]) { short t = a[e5]; a[e5] = a[e4]; a[e4] = t;
-            if (t < a[e3]) { a[e4] = a[e3]; a[e3] = t;
-                if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                    if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e4] < a[e3]) {
+            short t = a[e4];
+            a[e4] = a[e3];
+            a[e3] = t;
+            if (t < a[e2]) {
+                a[e3] = a[e2];
+                a[e2] = t;
+                if (t < a[e1]) {
+                    a[e2] = a[e1];
+                    a[e1] = t;
+                }
+            }
+        }
+        if (a[e5] < a[e4]) {
+            short t = a[e5];
+            a[e5] = a[e4];
+            a[e4] = t;
+            if (t < a[e3]) {
+                a[e4] = a[e3];
+                a[e3] = t;
+                if (t < a[e2]) {
+                    a[e3] = a[e2];
+                    a[e2] = t;
+                    if (t < a[e1]) {
+                        a[e2] = a[e1];
+                        a[e1] = t;
+                    }
                 }
             }
         }
 
         // Pointers
-        int less  = left;  // The index of the first element of center part
+        int less = left;  // The index of the first element of center part
         int great = right; // The index before the first element of right part
 
         if (a[e1] != a[e2] && a[e2] != a[e3] && a[e3] != a[e4] && a[e4] != a[e5]) {
@@ -1317,8 +1339,10 @@ final class DualPivotQuicksort {
             /*
              * Skip elements, which are less or greater than pivot values.
              */
-            while (a[++less] < pivot1);
-            while (a[--great] > pivot2);
+            while (a[++less] < pivot1)
+                ;
+            while (a[--great] > pivot2)
+                ;
 
             /*
              * Partitioning:
@@ -1373,8 +1397,10 @@ final class DualPivotQuicksort {
             }
 
             // Swap pivots into their final positions
-            a[left]  = a[less  - 1]; a[less  - 1] = pivot1;
-            a[right] = a[great + 1]; a[great + 1] = pivot2;
+            a[left] = a[less - 1];
+            a[less - 1] = pivot1;
+            a[right] = a[great + 1];
+            a[great + 1] = pivot2;
 
             // Sort left and right parts recursively, excluding known pivots
             sort(a, left, less - 2, leftmost);
@@ -1522,29 +1548,17 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array using the given
-     * workspace array slice if possible for merging
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    static void sort(char[] a, int left, int right,
-                     char[] work, int workBase, int workLen) {
+    static void sort(char[] a, int left, int right, char[] work, int workBase, int workLen) {
         // Use counting sort on large arrays
         if (right - left > COUNTING_SORT_THRESHOLD_FOR_SHORT_OR_CHAR) {
             int[] count = new int[NUM_CHAR_VALUES];
 
-            for (int i = left - 1; ++i <= right;
-                count[a[i]]++
-            );
+            for (int i = left - 1; ++i <= right; count[a[i]]++)
+                ;
             for (int i = NUM_CHAR_VALUES, k = right + 1; k > left; ) {
-                while (count[--i] == 0);
-                char value = (char) i;
+                while (count[--i] == 0)
+                    ;
+                char value = (char)i;
                 int s = count[i];
 
                 do {
@@ -1556,21 +1570,9 @@ final class DualPivotQuicksort {
         }
     }
 
-    /** The number of distinct char values. */
     private static final int NUM_CHAR_VALUES = 1 << 16;
 
-    /**
-     * Sorts the specified range of the array.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    private static void doSort(char[] a, int left, int right,
-                               char[] work, int workBase, int workLen) {
+    private static void doSort(char[] a, int left, int right, char[] work, int workBase, int workLen) {
         // Use Quicksort on small arrays
         if (right - left < QUICKSORT_THRESHOLD) {
             sort(a, left, right, true);
@@ -1582,21 +1584,27 @@ final class DualPivotQuicksort {
          * (ascending or descending sequence).
          */
         int[] run = new int[MAX_RUN_COUNT + 1];
-        int count = 0; run[0] = left;
+        int count = 0;
+        run[0] = left;
 
         // Check if the array is nearly sorted
         for (int k = left; k < right; run[count] = k) {
             // Equal items in the beginning of the sequence
             while (k < right && a[k] == a[k + 1])
                 k++;
-            if (k == right) break;  // Sequence finishes with equal items
+            if (k == right)
+                break;  // Sequence finishes with equal items
             if (a[k] < a[k + 1]) { // ascending
-                while (++k <= right && a[k - 1] <= a[k]);
+                while (++k <= right && a[k - 1] <= a[k])
+                    ;
             } else if (a[k] > a[k + 1]) { // descending
-                while (++k <= right && a[k - 1] >= a[k]);
+                while (++k <= right && a[k - 1] >= a[k])
+                    ;
                 // Transform into an ascending sequence
                 for (int lo = run[count] - 1, hi = k; ++lo < --hi; ) {
-                    char t = a[lo]; a[lo] = a[hi]; a[hi] = t;
+                    char t = a[lo];
+                    a[lo] = a[hi];
+                    a[hi] = t;
                 }
             }
 
@@ -1640,7 +1648,8 @@ final class DualPivotQuicksort {
 
         // Determine alternation base for merge
         byte odd = 0;
-        for (int n = 1; (n <<= 1) < count; odd ^= 1);
+        for (int n = 1; (n <<= 1) < count; odd ^= 1)
+            ;
 
         // Use or create temporary array b for merging
         char[] b;                 // temp array; alternates with a
@@ -1676,24 +1685,19 @@ final class DualPivotQuicksort {
                 run[++last] = hi;
             }
             if ((count & 1) != 0) {
-                for (int i = right, lo = run[count - 1]; --i >= lo;
-                    b[i + bo] = a[i + ao]
-                );
+                for (int i = right, lo = run[count - 1]; --i >= lo; b[i + bo] = a[i + ao])
+                    ;
                 run[++last] = right;
             }
-            char[] t = a; a = b; b = t;
-            int o = ao; ao = bo; bo = o;
+            char[] t = a;
+            a = b;
+            b = t;
+            int o = ao;
+            ao = bo;
+            bo = o;
         }
     }
 
-    /**
-     * Sorts the specified range of the array by Dual-Pivot Quicksort.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param leftmost indicates if this part is the leftmost in the range
-     */
     private static void sort(char[] a, int left, int right, boolean leftmost) {
         int length = right - left + 1;
 
@@ -1737,7 +1741,8 @@ final class DualPivotQuicksort {
                     char a1 = a[k], a2 = a[left];
 
                     if (a1 < a2) {
-                        a2 = a1; a1 = a[left];
+                        a2 = a1;
+                        a1 = a[left];
                     }
                     while (a1 < a[--k]) {
                         a[k + 2] = a[k];
@@ -1776,26 +1781,54 @@ final class DualPivotQuicksort {
         int e5 = e4 + seventh;
 
         // Sort these elements using insertion sort
-        if (a[e2] < a[e1]) { char t = a[e2]; a[e2] = a[e1]; a[e1] = t; }
-
-        if (a[e3] < a[e2]) { char t = a[e3]; a[e3] = a[e2]; a[e2] = t;
-            if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e2] < a[e1]) {
+            char t = a[e2];
+            a[e2] = a[e1];
+            a[e1] = t;
         }
-        if (a[e4] < a[e3]) { char t = a[e4]; a[e4] = a[e3]; a[e3] = t;
-            if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+
+        if (a[e3] < a[e2]) {
+            char t = a[e3];
+            a[e3] = a[e2];
+            a[e2] = t;
+            if (t < a[e1]) {
+                a[e2] = a[e1];
+                a[e1] = t;
             }
         }
-        if (a[e5] < a[e4]) { char t = a[e5]; a[e5] = a[e4]; a[e4] = t;
-            if (t < a[e3]) { a[e4] = a[e3]; a[e3] = t;
-                if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                    if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e4] < a[e3]) {
+            char t = a[e4];
+            a[e4] = a[e3];
+            a[e3] = t;
+            if (t < a[e2]) {
+                a[e3] = a[e2];
+                a[e2] = t;
+                if (t < a[e1]) {
+                    a[e2] = a[e1];
+                    a[e1] = t;
+                }
+            }
+        }
+        if (a[e5] < a[e4]) {
+            char t = a[e5];
+            a[e5] = a[e4];
+            a[e4] = t;
+            if (t < a[e3]) {
+                a[e4] = a[e3];
+                a[e3] = t;
+                if (t < a[e2]) {
+                    a[e3] = a[e2];
+                    a[e2] = t;
+                    if (t < a[e1]) {
+                        a[e2] = a[e1];
+                        a[e1] = t;
+                    }
                 }
             }
         }
 
         // Pointers
-        int less  = left;  // The index of the first element of center part
+        int less = left;  // The index of the first element of center part
         int great = right; // The index before the first element of right part
 
         if (a[e1] != a[e2] && a[e2] != a[e3] && a[e3] != a[e4] && a[e4] != a[e5]) {
@@ -1819,8 +1852,10 @@ final class DualPivotQuicksort {
             /*
              * Skip elements, which are less or greater than pivot values.
              */
-            while (a[++less] < pivot1);
-            while (a[--great] > pivot2);
+            while (a[++less] < pivot1)
+                ;
+            while (a[--great] > pivot2)
+                ;
 
             /*
              * Partitioning:
@@ -1875,8 +1910,10 @@ final class DualPivotQuicksort {
             }
 
             // Swap pivots into their final positions
-            a[left]  = a[less  - 1]; a[less  - 1] = pivot1;
-            a[right] = a[great + 1]; a[great + 1] = pivot2;
+            a[left] = a[less - 1];
+            a[less - 1] = pivot1;
+            a[right] = a[great + 1];
+            a[great + 1] = pivot2;
 
             // Sort left and right parts recursively, excluding known pivots
             sort(a, left, less - 2, leftmost);
@@ -2024,27 +2061,19 @@ final class DualPivotQuicksort {
         }
     }
 
-    /** The number of distinct byte values. */
     private static final int NUM_BYTE_VALUES = 1 << 8;
 
-    /**
-     * Sorts the specified range of the array.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     */
     static void sort(byte[] a, int left, int right) {
         // Use counting sort on large arrays
         if (right - left > COUNTING_SORT_THRESHOLD_FOR_BYTE) {
             int[] count = new int[NUM_BYTE_VALUES];
 
-            for (int i = left - 1; ++i <= right;
-                count[a[i] - Byte.MIN_VALUE]++
-            );
+            for (int i = left - 1; ++i <= right; count[a[i] - Byte.MIN_VALUE]++)
+                ;
             for (int i = NUM_BYTE_VALUES, k = right + 1; k > left; ) {
-                while (count[--i] == 0);
-                byte value = (byte) (i + Byte.MIN_VALUE);
+                while (count[--i] == 0)
+                    ;
+                byte value = (byte)(i + Byte.MIN_VALUE);
                 int s = count[i];
 
                 do {
@@ -2065,19 +2094,7 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array using the given
-     * workspace array slice if possible for merging
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    static void sort(float[] a, int left, int right,
-                     float[] work, int workBase, int workLen) {
+    static void sort(float[] a, int left, int right, float[] work, int workBase, int workLen) {
         /*
          * Phase 1: Move NaNs to the end of the array.
          */
@@ -2157,18 +2174,7 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    private static void doSort(float[] a, int left, int right,
-                               float[] work, int workBase, int workLen) {
+    private static void doSort(float[] a, int left, int right, float[] work, int workBase, int workLen) {
         // Use Quicksort on small arrays
         if (right - left < QUICKSORT_THRESHOLD) {
             sort(a, left, right, true);
@@ -2180,21 +2186,27 @@ final class DualPivotQuicksort {
          * (ascending or descending sequence).
          */
         int[] run = new int[MAX_RUN_COUNT + 1];
-        int count = 0; run[0] = left;
+        int count = 0;
+        run[0] = left;
 
         // Check if the array is nearly sorted
         for (int k = left; k < right; run[count] = k) {
             // Equal items in the beginning of the sequence
             while (k < right && a[k] == a[k + 1])
                 k++;
-            if (k == right) break;  // Sequence finishes with equal items
+            if (k == right)
+                break;  // Sequence finishes with equal items
             if (a[k] < a[k + 1]) { // ascending
-                while (++k <= right && a[k - 1] <= a[k]);
+                while (++k <= right && a[k - 1] <= a[k])
+                    ;
             } else if (a[k] > a[k + 1]) { // descending
-                while (++k <= right && a[k - 1] >= a[k]);
+                while (++k <= right && a[k - 1] >= a[k])
+                    ;
                 // Transform into an ascending sequence
                 for (int lo = run[count] - 1, hi = k; ++lo < --hi; ) {
-                    float t = a[lo]; a[lo] = a[hi]; a[hi] = t;
+                    float t = a[lo];
+                    a[lo] = a[hi];
+                    a[hi] = t;
                 }
             }
 
@@ -2238,7 +2250,8 @@ final class DualPivotQuicksort {
 
         // Determine alternation base for merge
         byte odd = 0;
-        for (int n = 1; (n <<= 1) < count; odd ^= 1);
+        for (int n = 1; (n <<= 1) < count; odd ^= 1)
+            ;
 
         // Use or create temporary array b for merging
         float[] b;                 // temp array; alternates with a
@@ -2274,24 +2287,19 @@ final class DualPivotQuicksort {
                 run[++last] = hi;
             }
             if ((count & 1) != 0) {
-                for (int i = right, lo = run[count - 1]; --i >= lo;
-                    b[i + bo] = a[i + ao]
-                );
+                for (int i = right, lo = run[count - 1]; --i >= lo; b[i + bo] = a[i + ao])
+                    ;
                 run[++last] = right;
             }
-            float[] t = a; a = b; b = t;
-            int o = ao; ao = bo; bo = o;
+            float[] t = a;
+            a = b;
+            b = t;
+            int o = ao;
+            ao = bo;
+            bo = o;
         }
     }
 
-    /**
-     * Sorts the specified range of the array by Dual-Pivot Quicksort.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param leftmost indicates if this part is the leftmost in the range
-     */
     private static void sort(float[] a, int left, int right, boolean leftmost) {
         int length = right - left + 1;
 
@@ -2335,7 +2343,8 @@ final class DualPivotQuicksort {
                     float a1 = a[k], a2 = a[left];
 
                     if (a1 < a2) {
-                        a2 = a1; a1 = a[left];
+                        a2 = a1;
+                        a1 = a[left];
                     }
                     while (a1 < a[--k]) {
                         a[k + 2] = a[k];
@@ -2374,26 +2383,54 @@ final class DualPivotQuicksort {
         int e5 = e4 + seventh;
 
         // Sort these elements using insertion sort
-        if (a[e2] < a[e1]) { float t = a[e2]; a[e2] = a[e1]; a[e1] = t; }
-
-        if (a[e3] < a[e2]) { float t = a[e3]; a[e3] = a[e2]; a[e2] = t;
-            if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e2] < a[e1]) {
+            float t = a[e2];
+            a[e2] = a[e1];
+            a[e1] = t;
         }
-        if (a[e4] < a[e3]) { float t = a[e4]; a[e4] = a[e3]; a[e3] = t;
-            if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+
+        if (a[e3] < a[e2]) {
+            float t = a[e3];
+            a[e3] = a[e2];
+            a[e2] = t;
+            if (t < a[e1]) {
+                a[e2] = a[e1];
+                a[e1] = t;
             }
         }
-        if (a[e5] < a[e4]) { float t = a[e5]; a[e5] = a[e4]; a[e4] = t;
-            if (t < a[e3]) { a[e4] = a[e3]; a[e3] = t;
-                if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                    if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e4] < a[e3]) {
+            float t = a[e4];
+            a[e4] = a[e3];
+            a[e3] = t;
+            if (t < a[e2]) {
+                a[e3] = a[e2];
+                a[e2] = t;
+                if (t < a[e1]) {
+                    a[e2] = a[e1];
+                    a[e1] = t;
+                }
+            }
+        }
+        if (a[e5] < a[e4]) {
+            float t = a[e5];
+            a[e5] = a[e4];
+            a[e4] = t;
+            if (t < a[e3]) {
+                a[e4] = a[e3];
+                a[e3] = t;
+                if (t < a[e2]) {
+                    a[e3] = a[e2];
+                    a[e2] = t;
+                    if (t < a[e1]) {
+                        a[e2] = a[e1];
+                        a[e1] = t;
+                    }
                 }
             }
         }
 
         // Pointers
-        int less  = left;  // The index of the first element of center part
+        int less = left;  // The index of the first element of center part
         int great = right; // The index before the first element of right part
 
         if (a[e1] != a[e2] && a[e2] != a[e3] && a[e3] != a[e4] && a[e4] != a[e5]) {
@@ -2417,8 +2454,10 @@ final class DualPivotQuicksort {
             /*
              * Skip elements, which are less or greater than pivot values.
              */
-            while (a[++less] < pivot1);
-            while (a[--great] > pivot2);
+            while (a[++less] < pivot1)
+                ;
+            while (a[--great] > pivot2)
+                ;
 
             /*
              * Partitioning:
@@ -2473,8 +2512,10 @@ final class DualPivotQuicksort {
             }
 
             // Swap pivots into their final positions
-            a[left]  = a[less  - 1]; a[less  - 1] = pivot1;
-            a[right] = a[great + 1]; a[great + 1] = pivot2;
+            a[left] = a[less - 1];
+            a[less - 1] = pivot1;
+            a[right] = a[great + 1];
+            a[great + 1] = pivot2;
 
             // Sort left and right parts recursively, excluding known pivots
             sort(a, left, less - 2, leftmost);
@@ -2622,19 +2663,7 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array using the given
-     * workspace array slice if possible for merging
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    static void sort(double[] a, int left, int right,
-                     double[] work, int workBase, int workLen) {
+    static void sort(double[] a, int left, int right, double[] work, int workBase, int workLen) {
         /*
          * Phase 1: Move NaNs to the end of the array.
          */
@@ -2714,18 +2743,7 @@ final class DualPivotQuicksort {
         }
     }
 
-    /**
-     * Sorts the specified range of the array.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param work a workspace array (slice)
-     * @param workBase origin of usable space in work array
-     * @param workLen usable size of work array
-     */
-    private static void doSort(double[] a, int left, int right,
-                               double[] work, int workBase, int workLen) {
+    private static void doSort(double[] a, int left, int right, double[] work, int workBase, int workLen) {
         // Use Quicksort on small arrays
         if (right - left < QUICKSORT_THRESHOLD) {
             sort(a, left, right, true);
@@ -2737,21 +2755,27 @@ final class DualPivotQuicksort {
          * (ascending or descending sequence).
          */
         int[] run = new int[MAX_RUN_COUNT + 1];
-        int count = 0; run[0] = left;
+        int count = 0;
+        run[0] = left;
 
         // Check if the array is nearly sorted
         for (int k = left; k < right; run[count] = k) {
             // Equal items in the beginning of the sequence
             while (k < right && a[k] == a[k + 1])
                 k++;
-            if (k == right) break;  // Sequence finishes with equal items
+            if (k == right)
+                break;  // Sequence finishes with equal items
             if (a[k] < a[k + 1]) { // ascending
-                while (++k <= right && a[k - 1] <= a[k]);
+                while (++k <= right && a[k - 1] <= a[k])
+                    ;
             } else if (a[k] > a[k + 1]) { // descending
-                while (++k <= right && a[k - 1] >= a[k]);
+                while (++k <= right && a[k - 1] >= a[k])
+                    ;
                 // Transform into an ascending sequence
                 for (int lo = run[count] - 1, hi = k; ++lo < --hi; ) {
-                    double t = a[lo]; a[lo] = a[hi]; a[hi] = t;
+                    double t = a[lo];
+                    a[lo] = a[hi];
+                    a[hi] = t;
                 }
             }
 
@@ -2795,7 +2819,8 @@ final class DualPivotQuicksort {
 
         // Determine alternation base for merge
         byte odd = 0;
-        for (int n = 1; (n <<= 1) < count; odd ^= 1);
+        for (int n = 1; (n <<= 1) < count; odd ^= 1)
+            ;
 
         // Use or create temporary array b for merging
         double[] b;                 // temp array; alternates with a
@@ -2831,24 +2856,19 @@ final class DualPivotQuicksort {
                 run[++last] = hi;
             }
             if ((count & 1) != 0) {
-                for (int i = right, lo = run[count - 1]; --i >= lo;
-                    b[i + bo] = a[i + ao]
-                );
+                for (int i = right, lo = run[count - 1]; --i >= lo; b[i + bo] = a[i + ao])
+                    ;
                 run[++last] = right;
             }
-            double[] t = a; a = b; b = t;
-            int o = ao; ao = bo; bo = o;
+            double[] t = a;
+            a = b;
+            b = t;
+            int o = ao;
+            ao = bo;
+            bo = o;
         }
     }
 
-    /**
-     * Sorts the specified range of the array by Dual-Pivot Quicksort.
-     *
-     * @param a the array to be sorted
-     * @param left the index of the first element, inclusive, to be sorted
-     * @param right the index of the last element, inclusive, to be sorted
-     * @param leftmost indicates if this part is the leftmost in the range
-     */
     private static void sort(double[] a, int left, int right, boolean leftmost) {
         int length = right - left + 1;
 
@@ -2892,7 +2912,8 @@ final class DualPivotQuicksort {
                     double a1 = a[k], a2 = a[left];
 
                     if (a1 < a2) {
-                        a2 = a1; a1 = a[left];
+                        a2 = a1;
+                        a1 = a[left];
                     }
                     while (a1 < a[--k]) {
                         a[k + 2] = a[k];
@@ -2931,26 +2952,54 @@ final class DualPivotQuicksort {
         int e5 = e4 + seventh;
 
         // Sort these elements using insertion sort
-        if (a[e2] < a[e1]) { double t = a[e2]; a[e2] = a[e1]; a[e1] = t; }
-
-        if (a[e3] < a[e2]) { double t = a[e3]; a[e3] = a[e2]; a[e2] = t;
-            if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e2] < a[e1]) {
+            double t = a[e2];
+            a[e2] = a[e1];
+            a[e1] = t;
         }
-        if (a[e4] < a[e3]) { double t = a[e4]; a[e4] = a[e3]; a[e3] = t;
-            if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+
+        if (a[e3] < a[e2]) {
+            double t = a[e3];
+            a[e3] = a[e2];
+            a[e2] = t;
+            if (t < a[e1]) {
+                a[e2] = a[e1];
+                a[e1] = t;
             }
         }
-        if (a[e5] < a[e4]) { double t = a[e5]; a[e5] = a[e4]; a[e4] = t;
-            if (t < a[e3]) { a[e4] = a[e3]; a[e3] = t;
-                if (t < a[e2]) { a[e3] = a[e2]; a[e2] = t;
-                    if (t < a[e1]) { a[e2] = a[e1]; a[e1] = t; }
+        if (a[e4] < a[e3]) {
+            double t = a[e4];
+            a[e4] = a[e3];
+            a[e3] = t;
+            if (t < a[e2]) {
+                a[e3] = a[e2];
+                a[e2] = t;
+                if (t < a[e1]) {
+                    a[e2] = a[e1];
+                    a[e1] = t;
+                }
+            }
+        }
+        if (a[e5] < a[e4]) {
+            double t = a[e5];
+            a[e5] = a[e4];
+            a[e4] = t;
+            if (t < a[e3]) {
+                a[e4] = a[e3];
+                a[e3] = t;
+                if (t < a[e2]) {
+                    a[e3] = a[e2];
+                    a[e2] = t;
+                    if (t < a[e1]) {
+                        a[e2] = a[e1];
+                        a[e1] = t;
+                    }
                 }
             }
         }
 
         // Pointers
-        int less  = left;  // The index of the first element of center part
+        int less = left;  // The index of the first element of center part
         int great = right; // The index before the first element of right part
 
         if (a[e1] != a[e2] && a[e2] != a[e3] && a[e3] != a[e4] && a[e4] != a[e5]) {
@@ -2974,8 +3023,10 @@ final class DualPivotQuicksort {
             /*
              * Skip elements, which are less or greater than pivot values.
              */
-            while (a[++less] < pivot1);
-            while (a[--great] > pivot2);
+            while (a[++less] < pivot1)
+                ;
+            while (a[--great] > pivot2)
+                ;
 
             /*
              * Partitioning:
@@ -3030,8 +3081,10 @@ final class DualPivotQuicksort {
             }
 
             // Swap pivots into their final positions
-            a[left]  = a[less  - 1]; a[less  - 1] = pivot1;
-            a[right] = a[great + 1]; a[great + 1] = pivot2;
+            a[left] = a[less - 1];
+            a[less - 1] = pivot1;
+            a[right] = a[great + 1];
+            a[great + 1] = pivot2;
 
             // Sort left and right parts recursively, excluding known pivots
             sort(a, left, less - 2, leftmost);

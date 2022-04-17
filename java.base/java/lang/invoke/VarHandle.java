@@ -697,32 +697,11 @@ public abstract class VarHandle {
     // Compare and set accessors
 
     /**
-     * Atomically sets the value of a variable to the {@code newValue} with the
-     * memory semantics of {@link #setVolatile} if the variable's current value,
-     * referred to as the <em>witness value</em>, {@code ==} the
-     * {@code expectedValue}, as accessed with the memory semantics of
-     * {@link #getVolatile}.
-     *
-     * <p>The method signature is of the form {@code (CT1 ct1, ..., CTn ctn, T expectedValue, T newValue)boolean}.
-     *
-     * <p>The symbolic type descriptor at the call site of {@code
-     * compareAndSet} must match the access mode type that is the result of
-     * calling {@code accessModeType(VarHandle.AccessMode.COMPARE_AND_SET)} on
-     * this VarHandle.
-     *
-     * @param args the signature-polymorphic parameter list of the form
-     * {@code (CT1 ct1, ..., CTn ctn, T expectedValue, T newValue)}
-     * , statically represented using varargs.
-     * @return {@code true} if successful, otherwise {@code false} if the
-     * witness value was not the same as the {@code expectedValue}.
-     * @throws UnsupportedOperationException if the access mode is unsupported
-     * for this VarHandle.
-     * @throws WrongMethodTypeException if the access mode type does not
-     * match the caller's symbolic type descriptor.
-     * @throws ClassCastException if the access mode type matches the caller's
-     * symbolic type descriptor, but a reference cast fails.
-     * @see #setVolatile(Object...)
-     * @see #getVolatile(Object...)
+     * CAS，原子操作
+     * @author liuzhen
+     * @date 2022/4/16 17:48
+     * @param args
+     * @return boolean
      */
     public final native
     @MethodHandle.PolymorphicSignature

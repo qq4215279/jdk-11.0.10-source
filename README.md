@@ -1,15 +1,19 @@
-# jdk-11.0.10-source
-## jdk 11 源码
+# jdk11 源码
+##  java.base
 
 
 
-### Object 
+### java.io：
 
 
 
+### java.lang：
+
+#### Object 
 
 
-### Integer
+
+#### Integer
 
 1. **Integer** **的声明**
 
@@ -35,31 +39,29 @@
 
 
 
-
-
-
-
-### String
+#### String
 
 1.  **String 类的定义**
-2. **字段属性**
-3. **构造⽅法**
-4. **equals(Object anObject)** 
-5. **hashCode()**
-6. **charAt(int index)**
-7. **compareTo(String anotherString) 和 compareToIgnoreCase(String str)** 
-8. **concat(String str)** 
-9. **indexOf(int ch) 和 indexOf(int ch, int fromIndex)**
-10. **split(String regex) 和 split(String regex, int limit)**
-11. **replace(char oldChar, char newChar) 和 String replaceAll(String regex, String replacement)**
-12. **substring(int beginIndex)  和 substring(int beginIndex, int endIndex)**
-13. **常量池**
-14. **intern()** 
-15. **String** **真的不可变吗**
+2.  **字段属性**
+3.  **构造⽅法**
+4.  **equals(Object anObject)** 
+5.  **hashCode()**
+6.  **charAt(int index)**
+7.  **compareTo(String anotherString) 和 compareToIgnoreCase(String str)** 
+8.  **concat(String str)** 
+9.  **indexOf(int ch) 和 indexOf(int ch, int fromIndex)**
+10.  **split(String regex) 和 split(String regex, int limit)**
+11.  **replace(char oldChar, char newChar) 和 String replaceAll(String regex, String replacement)**
+12.  **substring(int beginIndex)  和 substring(int beginIndex, int endIndex)**
+13.  **常量池**
+14.  **intern()** 
+15.  **String** **真的不可变吗**
 
 
 
-### Arrays
+### java.util：
+
+#### Arrays
 
 1. **asList**
 2. **sort**
@@ -69,7 +71,9 @@
 6. **fill**
 7. **toString** **和** **deepToString**
 
-### ArrayList
+
+
+#### ArrayList
 
 1. **ArrayList** **定义**
 2. **字段属性**
@@ -96,7 +100,7 @@
 
 
 
-### LinkedList
+#### LinkedList
 
 1. **LinkedList** **定义**
 2. **字段属性**
@@ -118,10 +122,10 @@
 
 
 
-### HashMap
+#### HashMap
 
 1. **哈希表**
-2. **HashMap****定义**
+2. **HashMap 定义**
 3. **字段属性**
 4. **构造函数**
 5. **确定哈希桶数组索引位置**
@@ -136,7 +140,7 @@
 
 
 
-### HashSet
+#### HashSet
 
 1. **HashSet** **定义**
 2. **字段属性**
@@ -148,7 +152,7 @@
 
 
 
-### LinkedHashMap
+#### LinkedHashMap
 
 1. **LinkedHashMap 定义**
 2. **字段属性**
@@ -161,7 +165,7 @@
 
 
 
-### LinkedHashSet
+#### LinkedHashSet
 
 1. **LinkedHashSet 定义**
 2. **构造函数**

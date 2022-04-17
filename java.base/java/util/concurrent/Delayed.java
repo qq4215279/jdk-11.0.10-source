@@ -1,33 +1,8 @@
 /*
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
  */
 
 /*
- *
- *
- *
- *
- *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
  * http://creativecommons.org/publicdomain/zero/1.0/
@@ -35,26 +10,16 @@
 
 package java.util.concurrent;
 
-/**
- * A mix-in style interface for marking objects that should be
- * acted upon after a given delay.
- *
- * <p>An implementation of this interface must define a
- * {@code compareTo} method that provides an ordering consistent with
- * its {@code getDelay} method.
- *
- * @since 1.5
- * @author Doug Lea
- */
 public interface Delayed extends Comparable<Delayed> {
 
     /**
-     * Returns the remaining delay associated with this object, in the
-     * given time unit.
-     *
-     * @param unit the time unit
-     * @return the remaining delay; zero or negative values indicate
-     * that the delay has already elapsed
+     * 关于该接口：
+     * 1. 如果getDelay的返回值小于或等于0，则说明该元素到期，需要从队列中拿出来执行。
+     * 2. 该接口首先继承了 Comparable 接口，所以要实现该接口，必须实现 Comparable 接口。具体来说，就是基于getDelay()的返回值比较两个元素的大小。
+     * @author liuzhen
+     * @date 2022/4/15 23:29
+     * @param unit
+     * @return long
      */
     long getDelay(TimeUnit unit);
 }

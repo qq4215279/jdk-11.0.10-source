@@ -42,8 +42,8 @@ public interface LongBinaryOperator {
     /**
      * Applies this operator to the given operands.
      *
-     * @param left the first operand
-     * @param right the second operand
+     * @param left the first operand 操作符的左值，就是base变量或者Cells[]中元素的当前值；
+     * @param right the second operand 右值，就是add()方法传入的参数x。
      * @return the operator result
      */
     long applyAsLong(long left, long right);

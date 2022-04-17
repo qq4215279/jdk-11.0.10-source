@@ -1,36 +1,5 @@
 /*
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- *
- *
- *
- *
- *
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
 package java.util.concurrent.atomic;
@@ -43,102 +12,42 @@ import java.util.function.DoubleBinaryOperator;
 import java.util.function.LongBinaryOperator;
 
 /**
- * A package-local class holding common representation and mechanics
- * for classes supporting dynamic striping on 64bit values. The class
- * extends Number so that concrete subclasses must publicly do so.
+ * 从JDK 8开始，针对Long型的原子操作，Java又提供了LongAdder、LongAccumulator；针对
+ * Double类型，Java提供了DoubleAdder、DoubleAccumulator。
+ * Striped64相关的类的继承层次如下：LongAdder  LongAccumulator  DoubleAdder  DoubleAccumulator
+ * @author liuzhen
+ * @date 2022/4/17 11:59
  */
 @SuppressWarnings("serial")
 abstract class Striped64 extends Number {
-    /*
-     * This class maintains a lazily-initialized table of atomically
-     * updated variables, plus an extra "base" field. The table size
-     * is a power of two. Indexing uses masked per-thread hash codes.
-     * Nearly all declarations in this class are package-private,
-     * accessed directly by subclasses.
-     *
-     * Table entries are of class Cell; a variant of AtomicLong padded
-     * (via @Contended) to reduce cache contention. Padding is
-     * overkill for most Atomics because they are usually irregularly
-     * scattered in memory and thus don't interfere much with each
-     * other. But Atomic objects residing in arrays will tend to be
-     * placed adjacent to each other, and so will most often share
-     * cache lines (with a huge negative performance impact) without
-     * this precaution.
-     *
-     * In part because Cells are relatively large, we avoid creating
-     * them until they are needed.  When there is no contention, all
-     * updates are made to the base field.  Upon first contention (a
-     * failed CAS on base update), the table is initialized to size 2.
-     * The table size is doubled upon further contention until
-     * reaching the nearest power of two greater than or equal to the
-     * number of CPUS. Table slots remain empty (null) until they are
-     * needed.
-     *
-     * A single spinlock ("cellsBusy") is used for initializing and
-     * resizing the table, as well as populating slots with new Cells.
-     * There is no need for a blocking lock; when the lock is not
-     * available, threads try other slots (or the base).  During these
-     * retries, there is increased contention and reduced locality,
-     * which is still better than alternatives.
-     *
-     * The Thread probe fields maintained via ThreadLocalRandom serve
-     * as per-thread hash codes. We let them remain uninitialized as
-     * zero (if they come in this way) until they contend at slot
-     * 0. They are then initialized to values that typically do not
-     * often conflict with others.  Contention and/or table collisions
-     * are indicated by failed CASes when performing an update
-     * operation. Upon a collision, if the table size is less than
-     * the capacity, it is doubled in size unless some other thread
-     * holds the lock. If a hashed slot is empty, and lock is
-     * available, a new Cell is created. Otherwise, if the slot
-     * exists, a CAS is tried.  Retries proceed by "double hashing",
-     * using a secondary hash (Marsaglia XorShift) to try to find a
-     * free slot.
-     *
-     * The table size is capped because, when there are more threads
-     * than CPUs, supposing that each thread were bound to a CPU,
-     * there would exist a perfect hash function mapping threads to
-     * slots that eliminates collisions. When we reach capacity, we
-     * search for this mapping by randomly varying the hash codes of
-     * colliding threads.  Because search is random, and collisions
-     * only become known via CAS failures, convergence can be slow,
-     * and because threads are typically not bound to CPUS forever,
-     * may not occur at all. However, despite these limitations,
-     * observed contention rates are typically low in these cases.
-     *
-     * It is possible for a Cell to become unused when threads that
-     * once hashed to it terminate, as well as in the case where
-     * doubling the table causes no thread to hash to it under
-     * expanded mask.  We do not try to detect or remove such cells,
-     * under the assumption that for long-running instances, observed
-     * contention levels will recur, so the cells will eventually be
-     * needed again; and for short-lived ones, it does not matter.
-     */
 
-    /**
-     * Padded variant of AtomicLong supporting only raw accesses plus CAS.
-     *
-     * JVM intrinsics note: It would be possible to use a release-only
-     * form of CAS here, if it were provided.
-     */
-    @jdk.internal.vm.annotation.Contended static final class Cell {
+    @jdk.internal.vm.annotation.Contended
+    static final class Cell {
         volatile long value;
-        Cell(long x) { value = x; }
+
+        Cell(long x) {
+            value = x;
+        }
+
         final boolean cas(long cmp, long val) {
             return VALUE.compareAndSet(this, cmp, val);
         }
+
         final void reset() {
             VALUE.setVolatile(this, 0L);
         }
+
         final void reset(long identity) {
             VALUE.setVolatile(this, identity);
         }
+
         final long getAndSet(long val) {
             return (long)VALUE.getAndSet(this, val);
         }
 
         // VarHandle mechanics
         private static final VarHandle VALUE;
+
         static {
             try {
                 MethodHandles.Lookup l = MethodHandles.lookup();
@@ -149,34 +58,17 @@ abstract class Striped64 extends Number {
         }
     }
 
-    /** Number of CPUS, to place bound on table size */
     static final int NCPU = Runtime.getRuntime().availableProcessors();
 
-    /**
-     * Table of cells. When non-null, size is a power of 2.
-     */
     transient volatile Cell[] cells;
 
-    /**
-     * Base value, used mainly when there is no contention, but also as
-     * a fallback during table initialization races. Updated via CAS.
-     */
     transient volatile long base;
 
-    /**
-     * Spinlock (locked via CAS) used when resizing and/or creating Cells.
-     */
     transient volatile int cellsBusy;
 
-    /**
-     * Package-private default constructor.
-     */
     Striped64() {
     }
 
-    /**
-     * CASes the base field.
-     */
     final boolean casBase(long cmp, long val) {
         return BASE.compareAndSet(this, cmp, val);
     }
@@ -185,26 +77,14 @@ abstract class Striped64 extends Number {
         return (long)BASE.getAndSet(this, val);
     }
 
-    /**
-     * CASes the cellsBusy field from 0 to 1 to acquire lock.
-     */
     final boolean casCellsBusy() {
         return CELLSBUSY.compareAndSet(this, 0, 1);
     }
 
-    /**
-     * Returns the probe value for the current thread.
-     * Duplicated from ThreadLocalRandom because of packaging restrictions.
-     */
     static final int getProbe() {
-        return (int) THREAD_PROBE.get(Thread.currentThread());
+        return (int)THREAD_PROBE.get(Thread.currentThread());
     }
 
-    /**
-     * Pseudo-randomly advances and records the given probe value for the
-     * given thread.
-     * Duplicated from ThreadLocalRandom because of packaging restrictions.
-     */
     static final int advanceProbe(int probe) {
         probe ^= probe << 13;   // xorshift
         probe ^= probe >>> 17;
@@ -214,59 +94,69 @@ abstract class Striped64 extends Number {
     }
 
     /**
-     * Handles cases of updates involving initialization, resizing,
-     * creating new Cells, and/or contention. See above for
-     * explanation. This method suffers the usual non-modularity
-     * problems of optimistic retry code, relying on rechecked sets of
-     * reads.
      *
-     * @param x the value
-     * @param fn the update function, or null for add (this convention
-     * avoids the need for an extra field or function in LongAdder).
-     * @param wasUncontended false if CAS failed before call
+     * @author liuzhen
+     * @date 2022/4/17 13:00
+     * @param x
+     * @param fn
+     * @param wasUncontended
+     * @return void
      */
-    final void longAccumulate(long x, LongBinaryOperator fn,
-                              boolean wasUncontended) {
+    final void longAccumulate(long x, LongBinaryOperator fn, boolean wasUncontended) {
         int h;
         if ((h = getProbe()) == 0) {
             ThreadLocalRandom.current(); // force initialization
             h = getProbe();
             wasUncontended = true;
         }
+        // true表示最后一个slot非空
         boolean collide = false;                // True if last slot nonempty
-        done: for (;;) {
-            Cell[] cs; Cell c; int n; long v;
+        done:
+        for (; ; ) {
+            Cell[] cs;
+            Cell c;
+            int n;
+            long v;
+            // 如果cells不是null，且cells长度大于0
             if ((cs = cells) != null && (n = cs.length) > 0) {
+                // cells最大下标对随机数取模，得到新下标。
+                // 如果此新下标处的元素是null
                 if ((c = cs[(n - 1) & h]) == null) {
+                    // 自旋锁标识，用于创建cells或扩容cells
                     if (cellsBusy == 0) {       // Try to attach new Cell
+                        // 尝试添加新的Cell
                         Cell r = new Cell(x);   // Optimistically create
+                        // 如果cellsBusy为0，则CAS操作cellsBusy为1，获取锁
                         if (cellsBusy == 0 && casCellsBusy()) {
+                            // 获取锁之后，再次检查
                             try {               // Recheck under lock
-                                Cell[] rs; int m, j;
-                                if ((rs = cells) != null &&
-                                    (m = rs.length) > 0 &&
-                                    rs[j = (m - 1) & h] == null) {
+                                Cell[] rs;
+                                int m, j;
+                                if ((rs = cells) != null && (m = rs.length) > 0 && rs[j = (m - 1) & h] == null) {
+                                    // 赋值成功，返回
                                     rs[j] = r;
                                     break done;
                                 }
                             } finally {
+                                // 重置标志位，释放锁
                                 cellsBusy = 0;
                             }
+                            // 如果slot非空，则进入下一次循环
                             continue;           // Slot is now non-empty
                         }
                     }
                     collide = false;
-                }
-                else if (!wasUncontended)       // CAS already known to fail
+                } else if (!wasUncontended) // CAS操作失败      // CAS already known to fail
+                    // rehash之后继续
                     wasUncontended = true;      // Continue after rehash
-                else if (c.cas(v = c.value,
-                               (fn == null) ? v + x : fn.applyAsLong(v, x)))
+                else if (c.cas(v = c.value, (fn == null) ? v + x : fn.applyAsLong(v, x)))
                     break;
                 else if (n >= NCPU || cells != cs)
                     collide = false;            // At max size or stale
                 else if (!collide)
                     collide = true;
                 else if (cellsBusy == 0 && casCellsBusy()) {
+                    // 扩容，每次都是上次的两倍长度
                     try {
                         if (cells == cs)        // Expand table unless stale
                             cells = Arrays.copyOf(cs, n << 1);
@@ -278,21 +168,28 @@ abstract class Striped64 extends Number {
                 }
                 h = advanceProbe(h);
             }
+            // 如果cells为null或者cells的长度为0，则需要初始化cells数组
+            // 此时需要加锁，进行CAS操作
             else if (cellsBusy == 0 && cells == cs && casCellsBusy()) {
                 try {                           // Initialize table
                     if (cells == cs) {
+                        // 实例化Cell数组，实例化Cell，保存x值
                         Cell[] rs = new Cell[2];
+                        // h为随机数，对Cells数组取模，赋值新的Cell对象。
                         rs[h & 1] = new Cell(x);
                         cells = rs;
                         break done;
                     }
                 } finally {
+                    // 释放CAS锁
                     cellsBusy = 0;
                 }
             }
             // Fall back on using base
-            else if (casBase(v = base,
-                             (fn == null) ? v + x : fn.applyAsLong(v, x)))
+            // 如果CAS操作失败，最后回到对base的操作
+            // 判断fn是否为null，如果是null则执行加操作，否则执行fn提供的操作
+            // 如果操作失败，则重试for循环流程，成功就退出循环
+            else if (casBase(v = base, (fn == null) ? v + x : fn.applyAsLong(v, x)))
                 break done;
         }
     }
@@ -303,14 +200,7 @@ abstract class Striped64 extends Number {
         return Double.doubleToRawLongBits(d);
     }
 
-    /**
-     * Same as longAccumulate, but injecting long/double conversions
-     * in too many places to sensibly merge with long version, given
-     * the low-overhead requirements of this class. So must instead be
-     * maintained by copy/paste/adapt.
-     */
-    final void doubleAccumulate(double x, DoubleBinaryOperator fn,
-                                boolean wasUncontended) {
+    final void doubleAccumulate(double x, DoubleBinaryOperator fn, boolean wasUncontended) {
         int h;
         if ((h = getProbe()) == 0) {
             ThreadLocalRandom.current(); // force initialization
@@ -318,18 +208,21 @@ abstract class Striped64 extends Number {
             wasUncontended = true;
         }
         boolean collide = false;                // True if last slot nonempty
-        done: for (;;) {
-            Cell[] cs; Cell c; int n; long v;
+        done:
+        for (; ; ) {
+            Cell[] cs;
+            Cell c;
+            int n;
+            long v;
             if ((cs = cells) != null && (n = cs.length) > 0) {
                 if ((c = cs[(n - 1) & h]) == null) {
                     if (cellsBusy == 0) {       // Try to attach new Cell
                         Cell r = new Cell(Double.doubleToRawLongBits(x));
                         if (cellsBusy == 0 && casCellsBusy()) {
                             try {               // Recheck under lock
-                                Cell[] rs; int m, j;
-                                if ((rs = cells) != null &&
-                                    (m = rs.length) > 0 &&
-                                    rs[j = (m - 1) & h] == null) {
+                                Cell[] rs;
+                                int m, j;
+                                if ((rs = cells) != null && (m = rs.length) > 0 && rs[j = (m - 1) & h] == null) {
                                     rs[j] = r;
                                     break done;
                                 }
@@ -340,8 +233,7 @@ abstract class Striped64 extends Number {
                         }
                     }
                     collide = false;
-                }
-                else if (!wasUncontended)       // CAS already known to fail
+                } else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
                 else if (c.cas(v = c.value, apply(fn, v, x)))
                     break;
@@ -360,8 +252,7 @@ abstract class Striped64 extends Number {
                     continue;                   // Retry with expanded table
                 }
                 h = advanceProbe(h);
-            }
-            else if (cellsBusy == 0 && cells == cs && casCellsBusy()) {
+            } else if (cellsBusy == 0 && cells == cs && casCellsBusy()) {
                 try {                           // Initialize table
                     if (cells == cs) {
                         Cell[] rs = new Cell[2];
@@ -383,24 +274,22 @@ abstract class Striped64 extends Number {
     private static final VarHandle BASE;
     private static final VarHandle CELLSBUSY;
     private static final VarHandle THREAD_PROBE;
+
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            BASE = l.findVarHandle(Striped64.class,
-                    "base", long.class);
-            CELLSBUSY = l.findVarHandle(Striped64.class,
-                    "cellsBusy", int.class);
-            l = java.security.AccessController.doPrivileged(
-                    new java.security.PrivilegedAction<>() {
-                        public MethodHandles.Lookup run() {
-                            try {
-                                return MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
-                            } catch (ReflectiveOperationException e) {
-                                throw new ExceptionInInitializerError(e);
-                            }
-                        }});
-            THREAD_PROBE = l.findVarHandle(Thread.class,
-                    "threadLocalRandomProbe", int.class);
+            BASE = l.findVarHandle(Striped64.class, "base", long.class);
+            CELLSBUSY = l.findVarHandle(Striped64.class, "cellsBusy", int.class);
+            l = java.security.AccessController.doPrivileged(new java.security.PrivilegedAction<>() {
+                public MethodHandles.Lookup run() {
+                    try {
+                        return MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
+                    } catch (ReflectiveOperationException e) {
+                        throw new ExceptionInInitializerError(e);
+                    }
+                }
+            });
+            THREAD_PROBE = l.findVarHandle(Thread.class, "threadLocalRandomProbe", int.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }

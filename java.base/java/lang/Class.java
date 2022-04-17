@@ -61,6 +61,11 @@ import sun.security.util.SecurityConstants;
 import sun.reflect.annotation.*;
 import sun.reflect.misc.ReflectUtil;
 
+/**
+ *
+ * @author liuzhen
+ * @date 2022/4/16 19:05
+ */
 public final class Class<T> implements java.io.Serializable, GenericDeclaration, Type, AnnotatedElement {
     private static final int ANNOTATION = 0x00002000;
     private static final int ENUM = 0x00004000;
