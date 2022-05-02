@@ -2076,8 +2076,7 @@ public final class LocalDate implements Temporal, TemporalAdjuster, ChronoLocalD
         StringBuilder buf = new StringBuilder(10);
         if (absYear < 1000) {
             if (yearValue < 0) {
-                buf.append(yearValue - 10000).dele3天赋与谷开来、
-                eCharAt(1);
+                buf.append(yearValue - 10000).deleteCharAt(1);
             } else {
                 buf.append(yearValue + 10000).deleteCharAt(0);
             }
