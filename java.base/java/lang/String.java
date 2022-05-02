@@ -34,7 +34,7 @@ import jdk.internal.vm.annotation.Stable;
  */
 public final class String implements java.io.Serializable, Comparable<String>, CharSequence {
 
-    /**⽤来存储字符串 */
+    /** ⽤来存储字符串 */
     @Stable
     private final byte[] value;
 
@@ -375,8 +375,8 @@ public final class String implements java.io.Serializable, Comparable<String>, C
      * 源码也很好理解，该⽅法是按字⺟顺序⽐较两个字符串，是基于字符串中每个字符的 Unicode 值。
      * 当两个字符串某个位置的字符不同时，返回的是这⼀位置的字符 Unicode 值之差，当两个字符串都相同
      * 时，返回两个字符串⻓度之差。
-     * 　　compareToIgnoreCase() ⽅法在 compareTo ⽅法的基础上忽略⼤⼩写，我们知道⼤写字⺟是⽐⼩
-     * 写字⺟的Unicode值⼩32的，底层实现是先都转换成⼤写⽐较，然后都转换成⼩写进⾏⽐较。
+     * compareToIgnoreCase() ⽅法在 compareTo ⽅法的基础上忽略⼤⼩写，我们知道⼤写字⺟是⽐⼩写字⺟的Unicode值⼩32的，
+     * 底层实现是先都转换成⼤写⽐较，然后都转换成⼩写进⾏⽐较。
      * @author liuzhen
      * @date 2022/4/9 17:35
      * @param anotherString
@@ -698,7 +698,9 @@ public final class String implements java.io.Serializable, Comparable<String>, C
      * 该⽅法是将指定的字符串连接到此字符串的末尾。
      * ⾸先判断要拼接的字符串⻓度是否为0，如果为0，则直接返回原字符串。如果不为0，则通过Arrays ⼯具类（后⾯会详细介绍这个⼯具类）的copyOf⽅法创建⼀个新的字符数组，
      * ⻓度为原字符串和要拼接的字符串之和，前⾯填充原字符串，后⾯为空。接着在通过 getChars ⽅法将要拼接的字符串放⼊新字符串后⾯为空的位置。
-     * 注意：返回值是 new String(buf, true)，也就是重新通过 new 关键字创建了⼀个新的字符串，原字符串是不变的。这也是前⾯我们说的⼀旦⼀个String对象被创建, 包含在这个对象中的字符序列是不可改变的。
+     *
+     * 注意：返回值是 new String(buf, true)，也就是重新通过 new 关键字创建了⼀个新的字符串，原字符串是不变的。
+     * 这也是前⾯我们说的⼀旦⼀个String对象被创建, 包含在这个对象中的字符序列是不可改变的。
      * @author liuzhen
      * @date 2022/4/9 17:38
      * @param str

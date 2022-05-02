@@ -34,7 +34,6 @@ import jdk.internal.access.SharedSecrets;
  * 由上述对比可以总结出来：这种设计一方面降低了Hash冲突，另一方面也提升了并发度。
  * @author liuzhen
  * @date 2022/4/10 10:10
- * @return
  */
 public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Cloneable, Serializable {
     /** 序列化和反序列化时，通过该字段进⾏版本⼀致性验证 */
@@ -63,8 +62,8 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
 
     /**
      * 初始化使⽤，⻓度总是 2的幂
-     * HashMap 是由数组+链表+红⿊树组成，这⾥的数组就是 table 字段。后⾯对其进⾏初始化⻓度默认是 DEFAULT_INITIAL_CAPACITY= 16。⽽且 JDK 声明数组的⻓度总是 2的n次⽅(⼀定是合数)，
-     * 为什么这⾥要求是合数，⼀般我们知道哈希算法为了避免冲突都要求⻓度是质数，这⾥要求是合数，
+     * HashMap 是由数组+链表+红⿊树组成，这⾥的数组就是 table 字段。后⾯对其进⾏初始化⻓度默认是 DEFAULT_INITIAL_CAPACITY= 16。
+     * ⽽且 JDK 声明数组的⻓度总是 2的n次⽅(⼀定是合数)，为什么这⾥要求是合数，⼀般我们知道哈希算法为了避免冲突都要求⻓度是质数，这⾥要求是合数。
      */
     transient Node<K, V>[] table;
 
@@ -94,6 +93,11 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
 
     /* ---------------- Public operations -------------- */
 
+    /**
+     * hashMap 存的值（链表）
+     * @param <K>
+     * @param <V>
+     */
     static class Node<K, V> implements Map.Entry<K, V> {
         final int hash;
         final K key;
@@ -144,6 +148,11 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
     /* ------------------------------------------------------------ */
     // Tree bins
 
+    /**
+     * 节点转换成树
+     * @param <K>
+     * @param <V>
+     */
     static final class TreeNode<K, V> extends LinkedHashMap.Entry<K, V> {
         TreeNode<K, V> parent; // red-black tree links
         TreeNode<K, V> left;
@@ -782,6 +791,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             throw new IllegalArgumentException("Illegal load factor: " + loadFactor);
 
         this.loadFactor = loadFactor;
+
         this.threshold = tableSizeFor(initialCapacity);
     }
 
@@ -854,19 +864,20 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         int n;
         K k;
 
-
         if ((tab = table) != null && (n = tab.length) > 0 && (first = tab[(n - 1) & hash]) != null) {
             // 根据key计算的索引检查第⼀个索引
             if (first.hash == hash && // always check first node
                 ((k = first.key) == key || (key != null && key.equals(k)))) {
                 return first;
             }
+
             // 不是第⼀个节点
             if ((e = first.next) != null) {
                 // 遍历树查找元素
                 if (first instanceof TreeNode) {
                     return ((TreeNode<K, V>)first).getTreeNode(hash, key);
                 }
+
                 // 遍历链表查找元素
                 do {
                     if (e.hash == hash && ((k = e.key) == key || (key != null && key.equals(k))))
@@ -906,16 +917,16 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
      * 过程：
      * 1. 判断键值对数组 table 是否为空或为null，否则执⾏resize()进⾏扩容；
      * 2. 根据键值key计算hash值得到插⼊的数组索引i，如果table[i]==null，直接新建节点添加，转向6，如果table[i]不为空，转向3；
-     * 3. 判断table[i]的⾸个元素是否和key⼀样，如果相同直接覆盖value，否则转向④，这⾥的相同指的是hashCode以及equals；
+     * 3. 判断table[i]的⾸个元素是否和key⼀样，如果相同直接覆盖value，否则转向4，这⾥的相同指的是hashCode以及equals；
      * 4. 判断table[i] 是否为treeNode，即table[i] 是否是红⿊树，如果是红⿊树，则直接在树中插⼊键值对，否则转向5；
      * 5. 遍历table[i]，判断链表⻓度是否⼤于8，⼤于8的话把链表转换为红⿊树，在红⿊树中执⾏插⼊操作，否则进⾏链表的插⼊操作；遍历过程中若发现key已经存在直接覆盖value即可；
      * 6. 插⼊成功后，判断实际存在的键值对数量size是否超过了最⼤容量threshold，如果超过，进⾏扩容。
      * 7. 如果新插⼊的key不存在，则返回null，如果新插⼊的key存在，则返回原key对应的value值（注意新插⼊的value会覆盖原value值）
      *
      * 这⾥有个考点，我们知道 HashMap 是由数组+链表+红⿊树（JDK1.8）组成，如果在添加元素时，
-     *  发⽣冲突，会将冲突的数放在链表上，当链表⻓度超过8时，会⾃动转换成红⿊树。
+     * 发⽣冲突，会将冲突的数放在链表上，当链表⻓度超过8时，会⾃动转换成红⿊树。
      * 那么有如下问题：数组上有5个元素，⽽某个链表上有3个元素，问此HashMap的 size 是多⼤？
-     * 　　我们分析第58,59 ⾏代码，很容易知道，只要是调⽤put() ⽅法添加元素，那么就会调⽤ ++size(这⾥有个例外是插⼊重复key的键值对，不会调⽤，
+     * 　　我们分析第988,989 ⾏代码，很容易知道，只要是调⽤put() ⽅法添加元素，那么就会调⽤ ++size(这⾥有个例外是插⼊重复key的键值对，不会调⽤，
      *     但是重复key元素不会影响size),所以，上⾯的答案是 7。
      * @author liuzhen
      * @date 2022/4/10 9:09
@@ -1228,6 +1239,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         return false;
     }
 
+    /**
+     * 获取所有的 keys 值
+     * @author liuzhen
+     * @date 2022/4/24 22:26
+     * @param
+     * @return java.util.Set<K>
+     */
     public Set<K> keySet() {
         Set<K> ks = keySet;
         if (ks == null) {
@@ -1237,6 +1255,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         return ks;
     }
 
+    /**
+     *
+     */
     final class KeySet extends AbstractSet<K> {
         public final int size() {
             return size;
@@ -1278,6 +1299,13 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         }
     }
 
+    /**
+     * 获取所有 values 值
+     * @author liuzhen
+     * @date 2022/4/24 22:26
+     * @param
+     * @return java.util.Collection<V>
+     */
     public Collection<V> values() {
         Collection<V> vs = values;
         if (vs == null) {
@@ -1287,6 +1315,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         return vs;
     }
 
+    /**
+     *
+     */
     final class Values extends AbstractCollection<V> {
         public final int size() {
             return size;
@@ -1324,11 +1355,21 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         }
     }
 
+    /**
+     * 获取所有的 Node 值
+     * @author liuzhen
+     * @date 2022/4/24 22:28
+     * @param
+     * @return java.util.Set<java.util.Map.Entry<K,V>>
+     */
     public Set<Map.Entry<K, V>> entrySet() {
         Set<Map.Entry<K, V>> es;
         return (es = entrySet) == null ? (entrySet = new EntrySet()) : es;
     }
 
+    /**
+     *
+     */
     final class EntrySet extends AbstractSet<Map.Entry<K, V>> {
         public final int size() {
             return size;

@@ -19,26 +19,20 @@ import java.io.IOException;
  * 对于 Entry before，Entry after ，以及 Entry head，Entry tail，这四个属性都是⽤来维护保证集合顺序的链表，
  * 其中前两个before和after表示某个节点的上⼀个节点和下⼀个节点，这是⼀个双向链表。
  * 后两个属性 head 和 tail 分别表示这个链表的头节点和尾节点。
+ *
+ * 1. 添加元素：LinkedHashMap 中是没有 put ⽅法的，直接调⽤⽗类 HashMap 的 put ⽅法。添加元素时重写了的4个⽅法：
+ * - newNode(hash, key, value, null);
+ * - putTreeVal(this, tab, hash, key, value)//newTreeNode(h, k, v, xpn)
+ * - afterNodeAccess(e);
+ * - afterNodeInsertion(evict);
+ *
+ * 2. 删除元素：同理也是调⽤ HashMap 的remove ⽅法。删除元素重写了 afterNodeRemoval() 方法。
+ *
+ * 3. 获取元素：get()
  * @author liuzhen
  * @date 2022/4/10 10:40
- * @return
  */
 public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
-
-    /**
-     * LinkedHashMap 的每个元素都是⼀个 Entry，我们看到对于 Entry 继承⾃ HashMap 的 Node 结构，
-     * 相对于 Node 结构，LinkedHashMap 多了 before 和 after 结构。
-     * @param <K>
-     * @param <V>
-     */
-    static class Entry<K, V> extends HashMap.Node<K, V> {
-        /**  before 和 after 便是⽤来维护 LinkedHashMap 插⼊ Entry 的先后顺序的 */
-        Entry<K, V> before, after;
-
-        Entry(int hash, K key, V value, Node<K, V> next) {
-            super(hash, key, value, next);
-        }
-    }
 
     private static final long serialVersionUID = 3801124242820219131L;
 
@@ -54,6 +48,21 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
      * false 表示按照插⼊顺序遍历
      */
     final boolean accessOrder;
+
+    /**
+     * LinkedHashMap 的每个元素都是⼀个 Entry，我们看到对于 Entry 继承⾃ HashMap 的 Node 结构，
+     * 相对于 Node 结构，LinkedHashMap 多了 before 和 after 结构。
+     * @param <K>
+     * @param <V>
+     */
+    static class Entry<K, V> extends HashMap.Node<K, V> {
+        /**  before 和 after 便是⽤来维护 LinkedHashMap 插⼊ Entry 的先后顺序的 */
+        Entry<K, V> before, after;
+
+        Entry(int hash, K key, V value, Node<K, V> next) {
+            super(hash, key, value, next);
+        }
+    }
 
     /**
      * 无参构造
@@ -122,6 +131,17 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         head = tail = null;
     }
 
+    /**
+     * 重写
+     *
+     * @author liuzhen
+     * @date 2022/4/24 22:36
+     * @param hash
+     * @param key
+     * @param value
+     * @param e
+     * @return java.util.HashMap.Node<K,V>
+     */
     Node<K, V> newNode(int hash, K key, V value, Node<K, V> e) {
         LinkedHashMap.Entry<K, V> p = new LinkedHashMap.Entry<>(hash, key, value, e);
         linkNodeLast(p);
@@ -170,57 +190,6 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         TreeNode<K, V> t = new TreeNode<>(q.hash, q.key, q.value, next);
         transferLinks(q, t);
         return t;
-    }
-
-    /**
-     * 把当前节点放到双向链表的尾部
-     * 该⽅法是在 accessOrder = true 并且 插⼊的当前节点不等于尾节点时，该⽅法才会⽣效。并且该⽅法的作⽤是将插⼊的节点变为尾节点，后⾯在get⽅法中也会调⽤。
-     * @author liuzhen
-     * @date 2022/4/10 10:55
-     * @param e
-     * @return void
-     */
-    void afterNodeAccess(Node<K, V> e) { // move node to last
-        LinkedHashMap.Entry<K, V> last;
-
-        // 当 accessOrder = true 并且当前节点不等于尾节点tail。这⾥将last节点赋值为tail节点
-        if (accessOrder && (last = tail) != e) {
-            // 记录当前节点的上⼀个节点b和下⼀个节点a
-            LinkedHashMap.Entry<K, V> p = (LinkedHashMap.Entry<K, V>)e, b = p.before, a = p.after;
-
-            // 释放当前节点和后⼀个节点的关系
-            p.after = null;
-            if (b == null) {
-                // 头节点=当前节点的下⼀个节点
-                head = a;
-            } else {
-                // 否则b的后节点指向a
-                b.after = a;
-            }
-
-            // 如果a != null
-            if (a != null) {
-                // a的前⼀个节点指向b
-                a.before = b;
-            } else {
-                // b设为尾节点
-                last = b;
-            }
-
-            // 如果尾节点为null
-            if (last == null) {
-                head = p;
-            } else {
-                // 否则将p放到双向链表的最后
-                p.before = last;
-                last.after = p;
-            }
-
-            // 将尾节点设为p
-            tail = p;
-            // LinkedHashMap对象操作次数+1，⽤于快速失败校验
-            ++modCount;
-        }
     }
 
     /**
@@ -319,6 +288,57 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         if (accessOrder)
             afterNodeAccess(e);
         return e.value;
+    }
+
+    /**
+     * 把当前节点放到双向链表的尾部
+     * 该⽅法是在 accessOrder = true 并且 插⼊的当前节点不等于尾节点时，该⽅法才会⽣效。并且该⽅法的作⽤是将插⼊的节点变为尾节点，后⾯在get⽅法中也会调⽤。
+     * @author liuzhen
+     * @date 2022/4/10 10:55
+     * @param e
+     * @return void
+     */
+    void afterNodeAccess(Node<K, V> e) { // move node to last
+        LinkedHashMap.Entry<K, V> last;
+
+        // 当 accessOrder = true 并且当前节点不等于尾节点tail。这⾥将last节点赋值为tail节点
+        if (accessOrder && (last = tail) != e) {
+            // 记录当前节点的上⼀个节点b和下⼀个节点a
+            LinkedHashMap.Entry<K, V> p = (LinkedHashMap.Entry<K, V>)e, b = p.before, a = p.after;
+
+            // 释放当前节点和后⼀个节点的关系
+            p.after = null;
+            if (b == null) {
+                // 头节点=当前节点的下⼀个节点
+                head = a;
+            } else {
+                // 否则b的后节点指向a
+                b.after = a;
+            }
+
+            // 如果a != null
+            if (a != null) {
+                // a的前⼀个节点指向b
+                a.before = b;
+            } else {
+                // b设为尾节点
+                last = b;
+            }
+
+            // 如果尾节点为null
+            if (last == null) {
+                head = p;
+            } else {
+                // 否则将p放到双向链表的最后
+                p.before = last;
+                last.after = p;
+            }
+
+            // 将尾节点设为p
+            tail = p;
+            // LinkedHashMap对象操作次数+1，⽤于快速失败校验
+            ++modCount;
+        }
     }
 
     public void clear() {

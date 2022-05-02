@@ -8,6 +8,7 @@ package java.util;
 import java.util.function.Consumer;
 
 public abstract class AbstractList<E> extends AbstractCollection<E> implements List<E> {
+    /**  */
     protected transient int modCount = 0;
 
     protected AbstractList() {

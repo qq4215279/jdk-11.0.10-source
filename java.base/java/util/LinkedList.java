@@ -8,12 +8,11 @@ package java.util;
 import java.util.function.Consumer;
 
 /**
- * 和 ArrayList 集合⼀样，LinkedList 集合也实现了Cloneable接⼝和Serializable接⼝，分别⽤来⽀持克隆以及⽀持序列化。List 接⼝也不⽤多说，定义了⼀套 List 集合类型的⽅法规范。
+ * 和 ArrayList 集合⼀样，LinkedList 集合也实现了Cloneable接⼝和Serializable接⼝，分别⽤来⽀持克隆以及⽀持序列化。
+ * List 接⼝也不⽤多说，定义了⼀套 List 集合类型的⽅法规范。
  * 注意，相对于 ArrayList 集合，LinkedList 集合多实现了⼀个 Deque 接⼝，这是⼀个双向队列接⼝，双向队列就是两端都可以进⾏增加和删除操作。
  * @author liuzhen
  * @date 2022/4/10 22:35
- * @param null
- * @return
  */
 public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>, Deque<E>, Cloneable, java.io.Serializable {
     /** 链表元素（节点）的个数 */
@@ -22,6 +21,29 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
     transient Node<E> first;
     /** 指向最后⼀个节点的指针 */
     transient Node<E> last;
+
+    /**
+     * Node
+     * 注意这⾥出现了⼀个 Node 类，这是 LinkedList 类中的⼀个内部类，其中每⼀个元素就代表⼀个Node 类对象，
+     * LinkedList 集合就是由许多个 Node 对象类似于⼿拉着⼿构成。
+     * @author liuzhen
+     * @date 2022/4/9 21:08
+     * @return
+     */
+    private static class Node<E> {
+        /** 实际存储的元素 */
+        E item;
+        /** 指向上⼀个节点的引⽤ */
+        Node<E> next;
+        /** 指向下⼀个节点的引⽤ */
+        Node<E> prev;
+
+        Node(Node<E> prev, E element, Node<E> next) {
+            this.item = element;
+            this.next = next;
+            this.prev = prev;
+        }
+    }
 
     /*
     void dataStructureInvariants() {
@@ -790,29 +812,6 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
         final void checkForComodification() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-        }
-    }
-
-    /**
-     * Node
-     * 注意这⾥出现了⼀个 Node 类，这是 LinkedList 类中的⼀个内部类，其中每⼀个元素就代表⼀个Node 类对象，
-     * LinkedList 集合就是由许多个 Node 对象类似于⼿拉着⼿构成。
-     * @author liuzhen
-     * @date 2022/4/9 21:08
-     * @return
-     */
-    private static class Node<E> {
-        /** 实际存储的元素 */
-        E item;
-        /** 指向上⼀个节点的引⽤ */
-        Node<E> next;
-        /** 指向下⼀个节点的引⽤ */
-        Node<E> prev;
-
-        Node(Node<E> prev, E element, Node<E> next) {
-            this.item = element;
-            this.next = next;
-            this.prev = prev;
         }
     }
 

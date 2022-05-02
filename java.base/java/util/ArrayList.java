@@ -14,14 +14,9 @@ import jdk.internal.access.SharedSecrets;
  *
  * @author liuzhen
  * @date 2022/4/10 23:38
- * @param null 
- * @return 
  */
 public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
     private static final long serialVersionUID = 8683452581122892189L;
-
-    /** 集合的默认⼤⼩ */
-    private static final int DEFAULT_CAPACITY = 10;
 
     /** 空的数组实例 */
     private static final Object[] EMPTY_ELEMENTDATA = {};
@@ -35,6 +30,9 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
      * 2. 当添加第⼀个元素时，elementData ⻓度会扩展为 DEFAULT_CAPACITY=10
      */
     transient Object[] elementData; // non-private to simplify nested class access
+
+    /** 集合的默认⼤⼩（初始容量） */
+    private static final int DEFAULT_CAPACITY = 10;
 
     /** 表示集合的⻓度 */
     private int size;
@@ -104,9 +102,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     }
 
     public void ensureCapacity(int minCapacity) {
-        if (minCapacity > elementData.length
-            && !(elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA
-                 && minCapacity <= DEFAULT_CAPACITY)) {
+        if (minCapacity > elementData.length && !(elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA && minCapacity <= DEFAULT_CAPACITY)) {
             modCount++;
             grow(minCapacity);
         }
@@ -173,6 +169,14 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return indexOf(o) >= 0;
     }
 
+    /** 
+     * 根据元素查找索引
+     * 注意：indexOf(Object o) ⽅法是返回第⼀次出现该元素的下标，如果没有则返回 -1。还有 lastIndexOf(Object o) ⽅法是返回最后⼀次出现该元素的下标。
+     * @author liuzhen
+     * @date 2022/4/24 17:39 
+     * @param o 
+     * @return int
+     */
     public int indexOf(Object o) {
         return indexOfRange(o, 0, size);
     }
@@ -272,6 +276,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     /**
      * 修改元素
      * 通过调⽤ set(int index, E element) ⽅法在指定索引 index 处的元素替换为 element。并返回原数组的元素
+     * 当索引为负数时，会抛出 java.lang.ArrayIndexOutOfBoundsException 异常。当索引⼤于集合⻓度时，会抛出 IndexOutOfBoundsException 异常。
      * @author liuzhen
      * @date 2022/4/9 19:02
      * @param index
@@ -312,8 +317,8 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
      * 2. 第 2 次添加元素，集合不为空，⽽且由于集合的⻓度size+1是⼩于数组的⻓度10，所以直接添加元素到数组的第⼆个位置，不⽤扩容。
      * 3. 第 11 次添加元素，此时 size+1 = 11，⽽数组⻓度是10，这时候创建⼀个⻓度为10+10*0.5 = 15 的数组（扩容1.5倍），然后将原数组元素引⽤拷⻉到新数组。
      *      并将第 11 次添加的元素赋值到新数组下标为10的位置。
-     * 4. 第 Integer.MAX_VALUE - 8 = 2147483639，然后 2147483639%1.5=1431655759（这个数是要进⾏扩容） 次添加元素，为了防⽌溢出，此时会直接创建⼀个 1431655759+1 ⼤⼩的数组，
-     *      这样⼀直，每次添加⼀个元素，都只扩⼤⼀个范围。
+     * 4. 第 Integer.MAX_VALUE - 8 = 2147483639，然后 2147483639%1.5=1431655759（这个数是要进⾏扩容） 次添加元素，
+     * 为了防⽌溢出，此时会直接创建⼀个 1431655759+1 ⼤⼩的数组，这样⼀直，每次添加⼀个元素，都只扩⼤⼀个范围。
      * 5. 第 Integer.MAX_VALUE - 7 次添加元素时，创建⼀个⼤⼩为 Integer.MAX_VALUE 的数组，在进⾏元素添加。
      * 6. 第 Integer.MAX_VALUE + 1 次添加元素时，抛出 OutOfMemoryError 异常。
      * 注意：能向集合中添加 null 的，因为数组可以有 null 值存在。
@@ -336,15 +341,15 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         Object[] elementData;
         if ((s = size) == (elementData = this.elementData).length)
             elementData = grow();
-        System.arraycopy(elementData, index,
-                         elementData, index + 1,
-                         s - index);
+        System.arraycopy(elementData, index, elementData, index + 1, s - index);
         elementData[index] = element;
         size = s + 1;
     }
 
     /**
      * 根据索引删除元素
+     * remove(int index) ⽅法表示删除索引index处的元素，⾸先通过 rangeCheck(index) ⽅法判断给定索引的范围，
+     * 超过集合⼤⼩则抛出异常；接着通过 System.arraycopy ⽅法对数组进⾏⾃身拷⻉。
      * @author liuzhen
      * @date 2022/4/9 18:55
      * @param index
@@ -366,6 +371,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
 
     /**
      * 直接删除指定元素
+     * remove(Object o)⽅法是删除第⼀次出现的该元素。然后通过System.arraycopy进⾏数组⾃身拷⻉。
      * @param o
      * @return
      */
@@ -655,6 +661,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         int cursor;
         // 返回最后⼀个元素的索引; 如果没有这样的话返回-1.
         int lastRet = -1;
+
         int expectedModCount = modCount;
 
         // prevent creating a synthetic constructor
@@ -726,8 +733,8 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         }
 
         /**
-         * 前⾯在新增元素add() 和 删除元素 remove() 时，我们可以看到 modCount++。修改set() 是没有的
-         * 也就是说不能在迭代器进⾏元素迭代时进⾏增加和删除操作，否则抛出异常
+         * 前⾯在新增元素add() 和 删除元素 remove() 时，我们可以看到 modCount++。
+         * 修改set() 是没有的也就是说不能在迭代器进⾏元素迭代时进⾏增加和删除操作，否则抛出异常
          */
         final void checkForComodification() {
             if (modCount != expectedModCount)

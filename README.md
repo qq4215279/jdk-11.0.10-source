@@ -19,21 +19,20 @@
 
 2. **主要属性**
 
-3. 构造方法
+3. **构造方法**
 
 4. **toString() toString(int i) toString(int i, int radix)**
 
 5. **自动拆箱和装箱**
+- Integet.valueOf()
+   
+- intValue()
+   
+6. **equals(Object obj)**
 
-   - Integet.valueOf()
+7. **hashCode()** 
 
-   - intValue()
-
-6. **equals(Object obj)****
-
-7. **hashCode()**
-
-8. **parseInt(String s)** **和** **parseInt(String s, int radix)** **
+8. **parseInt(String s)** **和** **parseInt(String s, int radix)** 
 
 9. **compareTo(Integer anotherInteger) 和 compare(int x, int y)**
 
@@ -173,3 +172,133 @@
 4. **删除元素**
 5. **查找元素**
 6. **遍历元素**
+
+
+
+### JUC(Java.util.concurrent)
+
+#### 并发容器
+
+##### 1. BlockingQueue
+
+######  1.1 ArrayBlockingQueue
+
+ArrayBlockingQueue是一个用数组实现的环形队列，在构造方法中，会要求传入数组的容量。
+
+
+
+###### 1.2  LinkedBlockingQueue
+
+
+
+###### 1.3 PriorityBlockingQueue
+
+
+
+###### 1.4 DelayQueue
+
+
+
+###### 1.5 SynchronousQueue
+
+
+
+##### 2.  BlockingDeque
+
+
+
+##### 3.  CopyOnWrite
+
+###### 3.1 CopyOnWriteArrayList
+
+
+
+###### 3.2 CopyOnWriteArraySet
+
+
+
+##### 4. ConcurrentLinkedQueue/Deque
+
+###### 4.1 ConcurrentLinkedQueue 
+
+###### 4.2 ConcurrentLinkedDeque
+
+
+
+##### 5. ConcurrentHashMap
+
+
+
+##### 6. ConcurrentSkipListMap/Set
+
+###### 6.1  ConcurrentSkipListMap
+
+
+
+###### 6.2 ConcurrentSkipListSet
+
+
+
+#### 同步工具类
+
+##### 1. Semaphore
+
+
+
+#####  2. CountDownLatch
+
+
+
+##### 3. CyclicBarrier
+
+
+
+##### 4. Exchanger
+
+
+
+##### 5. Phaser
+
+
+
+#### Atomic 类
+
+##### 1.  AtomicInteger 和 AtomicLong
+
+
+
+##### 2. AtomicBoolean 和 AtomicReference
+
+
+
+##### 3. AtomicStampedReference 和 AtomicMarkableReference
+
+
+
+##### 4.  AtomicIntegerFieldUpdater、AtomicLongFieldUpdater 和 AtomicReferenceFieldUpdater
+
+
+
+##### 5.  AtomicIntegerArray、AtomicLongArray 和 AtomicReferenceArray
+
+
+
+##### 6. Striped64 与 LongAdder
+
+
+
+#### Lock 与 Condition
+
+##### 1. 互斥锁 ReentrantLock 
+
+
+
+##### 2. 读写锁 ReentrantReadWriteLock
+
+
+
+##### 3. Condition
+
+
+
+##### 4. StampedLock

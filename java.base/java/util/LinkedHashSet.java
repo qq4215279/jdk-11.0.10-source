@@ -9,7 +9,6 @@ package java.util;
  *
  * @author liuzhen
  * @date 2022/4/10 11:07
- * @return
  */
 public class LinkedHashSet<E> extends HashSet<E> implements Set<E>, Cloneable, java.io.Serializable {
 

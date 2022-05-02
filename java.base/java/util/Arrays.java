@@ -29,7 +29,6 @@ import java.util.stream.StreamSupport;
 /**
  * @author liuzhen
  * @date 2022/4/11 12:50
- * @return
  */
 public class Arrays {
 
@@ -1382,11 +1381,9 @@ public class Arrays {
     }
 
     /**
-     *
+     * 内部list类
      * @author liuzhen
      * @date 2022/4/11 17:28
-     * @param null
-     * @return
      */
     private static class ArrayList<E> extends AbstractList<E> implements RandomAccess, java.io.Serializable {
         private static final long serialVersionUID = -2764017481108945198L;
@@ -1720,6 +1717,13 @@ public class Arrays {
         }
     }
 
+    /**
+     *
+     * @author liuzhen
+     * @date 2022/4/24 17:00
+     * @param a
+     * @return java.lang.String
+     */
     public static String toString(int[] a) {
         if (a == null)
             return "null";

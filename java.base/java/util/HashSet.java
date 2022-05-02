@@ -13,7 +13,6 @@ import jdk.internal.access.SharedSecrets;
  * HashSet 是⼀个由 HashMap 实现的集合。元素⽆序且不能重复。
  * @author liuzhen
  * @date 2022/4/10 10:12
- * @return
  */
 public class HashSet<E> extends AbstractSet<E> implements Set<E>, Cloneable, java.io.Serializable {
     static final long serialVersionUID = -5024744406713321676L;

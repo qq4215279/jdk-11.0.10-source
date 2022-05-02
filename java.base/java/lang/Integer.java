@@ -27,6 +27,7 @@ package java.lang;
 
 import java.lang.annotation.Native;
 import java.util.Objects;
+
 import jdk.internal.HotSpotIntrinsicCandidate;
 import jdk.internal.misc.VM;
 
@@ -34,29 +35,34 @@ import static java.lang.String.COMPACT_STRINGS;
 import static java.lang.String.LATIN1;
 import static java.lang.String.UTF16;
 
-/** 
- *
+/**
  * @author liuzhen
  * @date 2022/4/10 23:38
- * @param null 
- * @return 
  */
 public final class Integer extends Number implements Comparable<Integer> {
-    @Native public static final int   MIN_VALUE = 0x80000000;
 
-    @Native public static final int   MAX_VALUE = 0x7fffffff;
+    /**
+     * 最小值
+     */
+    @Native
+    public static final int MIN_VALUE = 0x80000000;
+    /**
+     * 最大值
+     */
+    @Native
+    public static final int MAX_VALUE = 0x7fffffff;
 
-    public static final Class<Integer>  TYPE = (Class<Integer>) Class.getPrimitiveClass("int");
+    public static final Class<Integer> TYPE = (Class<Integer>)Class.getPrimitiveClass("int");
 
-    static final char[] digits = {
-        '0' , '1' , '2' , '3' , '4' , '5' ,
-        '6' , '7' , '8' , '9' , 'a' , 'b' ,
-        'c' , 'd' , 'e' , 'f' , 'g' , 'h' ,
-        'i' , 'j' , 'k' , 'l' , 'm' , 'n' ,
-        'o' , 'p' , 'q' , 'r' , 's' , 't' ,
-        'u' , 'v' , 'w' , 'x' , 'y' , 'z'
-    };
+    /** 用来表示int二进制补码形式的值的位数 */
+    @Native
+    public static final int SIZE = 32;
 
+    /** Class表示原始类型的实例int */
+    public static final int BYTES = SIZE / Byte.SIZE;
+
+    static final char[] digits = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
 
     private static String toStringUTF16(int i, int radix) {
         byte[] buf = new byte[33 * 2];
@@ -141,32 +147,15 @@ public final class Integer extends Number implements Comparable<Integer> {
         } while (charPos > offset);
     }
 
-    static final byte[] DigitTens = {
-        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
-        '1', '1', '1', '1', '1', '1', '1', '1', '1', '1',
-        '2', '2', '2', '2', '2', '2', '2', '2', '2', '2',
-        '3', '3', '3', '3', '3', '3', '3', '3', '3', '3',
-        '4', '4', '4', '4', '4', '4', '4', '4', '4', '4',
-        '5', '5', '5', '5', '5', '5', '5', '5', '5', '5',
-        '6', '6', '6', '6', '6', '6', '6', '6', '6', '6',
-        '7', '7', '7', '7', '7', '7', '7', '7', '7', '7',
-        '8', '8', '8', '8', '8', '8', '8', '8', '8', '8',
-        '9', '9', '9', '9', '9', '9', '9', '9', '9', '9',
-        } ;
+    static final byte[] DigitTens = {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '2', '2',
+        '2', '2', '2', '2', '2', '2', '2', '2', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3', '4', '4', '4', '4', '4', '4', '4', '4', '4', '4',
+        '5', '5', '5', '5', '5', '5', '5', '5', '5', '5', '6', '6', '6', '6', '6', '6', '6', '6', '6', '6', '7', '7', '7', '7', '7', '7', '7', '7',
+        '7', '7', '8', '8', '8', '8', '8', '8', '8', '8', '8', '8', '9', '9', '9', '9', '9', '9', '9', '9', '9', '9',};
 
-    static final byte[] DigitOnes = {
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        } ;
-
+    static final byte[] DigitOnes = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1',
+        '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',};
 
     public static String toUnsignedString(int i) {
         return Long.toString(toUnsignedLong(i));
@@ -175,12 +164,13 @@ public final class Integer extends Number implements Comparable<Integer> {
     /**
      * 第⼀个if判断，如果i<0,sign记下它的符号“-”，同时将i转成整数。
      * 下⾯所有的操作也就只针对整数了，最后在判断sign如果不等于零将 sign 你的值放在char数组的⾸位buf [--charPos] = sign;。
+     *
+     * @param i     被初始化的数字，
+     * @param index 这个数字的⻓度(包含了负数的符号“-”)，
+     * @param buf   字符串的容器-⼀个char型数组。
+     * @return int
      * @author liuzhen
      * @date 2022/4/9 17:08
-     * @param i 被初始化的数字，
-     * @param index 这个数字的⻓度(包含了负数的符号“-”)，
-     * @param buf 字符串的容器-⼀个char型数组。
-     * @return int
      */
     static int getChars(int i, int index, byte[] buf) {
         int q, r;
@@ -218,22 +208,23 @@ public final class Integer extends Number implements Comparable<Integer> {
 
     /**
      * sizeTable
+     *
      * @author liuzhen
      * @date 2022/4/9 17:06
      * @param null
      * @return
      */
     // Left here for compatibility reasons, see JDK-8143900.
-    static final int [] sizeTable = { 9, 99, 999, 9999, 99999, 999999, 9999999,
-                                      99999999, 999999999, Integer.MAX_VALUE };
+    static final int[] sizeTable = {9, 99, 999, 9999, 99999, 999999, 9999999, 99999999, 999999999, Integer.MAX_VALUE};
 
     /**
      * ⽤来计算参数 x 的位数也就是转成字符串之后的字符串的⻓度，内部结合⼀个已经初始化好的int类型的数组sizeTable来完成这个计算。
      * 实现的形式很巧妙。注意负数包含符号位，所以对于负数的位数是 stringSize(-i) + 1。
-     * @author liuzhen
-     * @date 2022/4/9 17:05
+     *
      * @param x
      * @return int
+     * @author liuzhen
+     * @date 2022/4/9 17:05
      */
     static int stringSize(int x) {
         int d = 1;
@@ -251,17 +242,16 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     public static int parseInt(String s) throws NumberFormatException {
-        // ⾸先调⽤parseInt(s,10)⽅法，其中s表示我们需要转换的字符串，10表示以⼗进制输出，默认也是10进制
-        return parseInt(s,10);
+        // ⾸先调⽤parseInt(s, 10)⽅法，其中s表示我们需要转换的字符串，10表示以⼗进制输出，默认也是10进制
+        return parseInt(s, 10);
     }
 
     /**
-     *
-     * @author liuzhen
-     * @date 2022/4/9 17:12
      * @param s
      * @param radix
      * @return int
+     * @author liuzhen
+     * @date 2022/4/9 17:12
      */
     public static int parseInt(String s, int radix) throws NumberFormatException {
         /*
@@ -309,6 +299,7 @@ public final class Integer extends Number implements Comparable<Integer> {
                 }
                 i++;
             }
+
             int multmin = limit / radix;
 
             int result = 0;
@@ -387,9 +378,8 @@ public final class Integer extends Number implements Comparable<Integer> {
         }
     }
 
-    public static int parseUnsignedInt(String s, int radix)
-                throws NumberFormatException {
-        if (s == null)  {
+    public static int parseUnsignedInt(String s, int radix) throws NumberFormatException {
+        if (s == null) {
             throw new NumberFormatException("null");
         }
 
@@ -397,21 +387,17 @@ public final class Integer extends Number implements Comparable<Integer> {
         if (len > 0) {
             char firstChar = s.charAt(0);
             if (firstChar == '-') {
-                throw new
-                    NumberFormatException(String.format("Illegal leading minus sign " +
-                                                       "on unsigned string %s.", s));
+                throw new NumberFormatException(String.format("Illegal leading minus sign " + "on unsigned string %s.", s));
             } else {
                 if (len <= 5 || // Integer.MAX_VALUE in Character.MAX_RADIX is 6 digits
-                    (radix == 10 && len <= 9) ) { // Integer.MAX_VALUE in base 10 is 10 digits
+                    (radix == 10 && len <= 9)) { // Integer.MAX_VALUE in base 10 is 10 digits
                     return parseInt(s, radix);
                 } else {
                     long ell = Long.parseLong(s, radix);
                     if ((ell & 0xffff_ffff_0000_0000L) == 0) {
-                        return (int) ell;
+                        return (int)ell;
                     } else {
-                        throw new
-                            NumberFormatException(String.format("String value %s exceeds " +
-                                                                "range of unsigned int.", s));
+                        throw new NumberFormatException(String.format("String value %s exceeds " + "range of unsigned int.", s));
                     }
                 }
             }
@@ -420,8 +406,7 @@ public final class Integer extends Number implements Comparable<Integer> {
         }
     }
 
-    public static int parseUnsignedInt(CharSequence s, int beginIndex, int endIndex, int radix)
-                throws NumberFormatException {
+    public static int parseUnsignedInt(CharSequence s, int beginIndex, int endIndex, int radix) throws NumberFormatException {
         s = Objects.requireNonNull(s);
 
         if (beginIndex < 0 || beginIndex > endIndex || endIndex > s.length()) {
@@ -432,21 +417,17 @@ public final class Integer extends Number implements Comparable<Integer> {
         if (len > 0) {
             char firstChar = s.charAt(start);
             if (firstChar == '-') {
-                throw new
-                    NumberFormatException(String.format("Illegal leading minus sign " +
-                                                       "on unsigned string %s.", s));
+                throw new NumberFormatException(String.format("Illegal leading minus sign " + "on unsigned string %s.", s));
             } else {
                 if (len <= 5 || // Integer.MAX_VALUE in Character.MAX_RADIX is 6 digits
-                        (radix == 10 && len <= 9)) { // Integer.MAX_VALUE in base 10 is 10 digits
+                    (radix == 10 && len <= 9)) { // Integer.MAX_VALUE in base 10 is 10 digits
                     return parseInt(s, start, start + len, radix);
                 } else {
                     long ell = Long.parseLong(s, start, start + len, radix);
                     if ((ell & 0xffff_ffff_0000_0000L) == 0) {
-                        return (int) ell;
+                        return (int)ell;
                     } else {
-                        throw new
-                            NumberFormatException(String.format("String value %s exceeds " +
-                                                                "range of unsigned int.", s));
+                        throw new NumberFormatException(String.format("String value %s exceeds " + "range of unsigned int.", s));
                     }
                 }
             }
@@ -459,7 +440,9 @@ public final class Integer extends Number implements Comparable<Integer> {
         return parseUnsignedInt(s, 10);
     }
 
-
+    /**
+     * 池
+     */
     private static class IntegerCache {
         static final int low = -128;
         static final int high;
@@ -468,15 +451,14 @@ public final class Integer extends Number implements Comparable<Integer> {
         static {
             // high value may be configured by property
             int h = 127;
-            String integerCacheHighPropValue =
-                VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
+            String integerCacheHighPropValue = VM.getSavedProperty("java.lang.Integer.IntegerCache.high");
             if (integerCacheHighPropValue != null) {
                 try {
                     int i = parseInt(integerCacheHighPropValue);
                     i = Math.max(i, 127);
                     // Maximum array size is Integer.MAX_VALUE
-                    h = Math.min(i, Integer.MAX_VALUE - (-low) -1);
-                } catch( NumberFormatException nfe) {
+                    h = Math.min(i, Integer.MAX_VALUE - (-low) - 1);
+                } catch (NumberFormatException nfe) {
                     // If the property cannot be parsed into an int, ignore it.
                 }
             }
@@ -484,14 +466,15 @@ public final class Integer extends Number implements Comparable<Integer> {
 
             cache = new Integer[(high - low) + 1];
             int j = low;
-            for(int k = 0; k < cache.length; k++)
+            for (int k = 0; k < cache.length; k++)
                 cache[k] = new Integer(j++);
 
             // range [-128, 127] must be interned (JLS7 5.1.7)
             assert IntegerCache.high >= 127;
         }
 
-        private IntegerCache() {}
+        private IntegerCache() {
+        }
     }
 
     /**
@@ -500,14 +483,15 @@ public final class Integer extends Number implements Comparable<Integer> {
      * 但是这⾥要注意前⾯的⼀段代码，当i的值-128 <= i <= 127 返回的是缓存类中的对象，并没有重新创建⼀个新的对象，
      * 这在通过 equals 进⾏⽐较的时候我们要注意。
      * 这就是基本数据类型的⾃动装箱，128是基本数据类型，然后被解析成Integer类。
-     *
+     * <p>
      * 简单来讲：
-     *  ⾃动装箱就是Integer.valueOf(int i);
-     *  ⾃动拆箱就是 i.intValue();
-     * @author liuzhen
-     * @date 2022/4/9 17:13
+     * ⾃动装箱就是 Integer.valueOf(int i);
+     * ⾃动拆箱就是 i.intValue();
+     *
      * @param i
      * @return java.lang.Integer
+     * @author liuzhen
+     * @date 2022/4/9 17:13
      */
     @HotSpotIntrinsicCandidate
     public static Integer valueOf(int i) {
@@ -522,17 +506,17 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     public static Integer valueOf(String s, int radix) throws NumberFormatException {
-        return Integer.valueOf(parseInt(s,radix));
+        return Integer.valueOf(parseInt(s, radix));
     }
 
     private final int value;
 
-    @Deprecated(since="9")
+    @Deprecated(since = "9")
     public Integer(int value) {
         this.value = value;
     }
 
-    @Deprecated(since="9")
+    @Deprecated(since = "9")
     public Integer(String s) throws NumberFormatException {
         this.value = parseInt(s, 10);
     }
@@ -564,10 +548,11 @@ public final class Integer extends Number implements Comparable<Integer> {
 
     /**
      * 这三个⽅法重载，能返回⼀个整型数据所表示的字符串形式，其中最后⼀个⽅法 toString(int,int) 第⼆个参数是表示的进制数。
-     * @author liuzhen
-     * @date 2022/4/9 17:05
+     *
      * @param
      * @return java.lang.String
+     * @author liuzhen
+     * @date 2022/4/9 17:05
      */
     public String toString() {
         return toString(value);
@@ -624,10 +609,11 @@ public final class Integer extends Number implements Comparable<Integer> {
 
     /**
      * 直接返回其 int 类型的数据。
-     * @author liuzhen
-     * @date 2022/4/9 17:18
+     *
      * @param
      * @return int
+     * @author liuzhen
+     * @date 2022/4/9 17:18
      */
     @Override
     public int hashCode() {
@@ -640,10 +626,11 @@ public final class Integer extends Number implements Comparable<Integer> {
 
     /**
      * 先通过 instanceof 关键字判断两个⽐较对象的关系，然后将对象强转为Integer，在通过⾃动拆箱，转换成两个基本数据类 int，然后通过 == ⽐较。
-     * @author liuzhen
-     * @date 2022/4/9 17:17
+     *
      * @param obj
      * @return boolean
+     * @author liuzhen
+     * @date 2022/4/9 17:17
      */
     public boolean equals(Object obj) {
         if (obj instanceof Integer) {
@@ -696,13 +683,11 @@ public final class Integer extends Number implements Comparable<Integer> {
         if (nm.startsWith("0x", index) || nm.startsWith("0X", index)) {
             index += 2;
             radix = 16;
-        }
-        else if (nm.startsWith("#", index)) {
-            index ++;
+        } else if (nm.startsWith("#", index)) {
+            index++;
             radix = 16;
-        }
-        else if (nm.startsWith("0", index) && nm.length() > 1 + index) {
-            index ++;
+        } else if (nm.startsWith("0", index) && nm.length() > 1 + index) {
+            index++;
             radix = 8;
         }
 
@@ -716,8 +701,7 @@ public final class Integer extends Number implements Comparable<Integer> {
             // If number is Integer.MIN_VALUE, we'll end up here. The next line
             // handles this case, and causes any genuine format error to be
             // rethrown.
-            String constant = negative ? ("-" + nm.substring(index))
-                                       : nm.substring(index);
+            String constant = negative ? ("-" + nm.substring(index)) : nm.substring(index);
             result = Integer.valueOf(constant, radix);
         }
         return result;
@@ -725,10 +709,11 @@ public final class Integer extends Number implements Comparable<Integer> {
 
     /**
      * compareTo(Integer anotherInteger)
-     * @author liuzhen
-     * @date 2022/4/9 17:20
+     *
      * @param anotherInteger
      * @return int
+     * @author liuzhen
+     * @date 2022/4/9 17:20
      */
     public int compareTo(Integer anotherInteger) {
         return compare(this.value, anotherInteger.value);
@@ -743,7 +728,7 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     public static long toUnsignedLong(int x) {
-        return ((long) x) & 0xffffffffL;
+        return ((long)x) & 0xffffffffL;
     }
 
     public static int divideUnsigned(int dividend, int divisor) {
@@ -755,12 +740,6 @@ public final class Integer extends Number implements Comparable<Integer> {
         // In lieu of tricky code, for now just use long arithmetic.
         return (int)(toUnsignedLong(dividend) % toUnsignedLong(divisor));
     }
-
-
-
-    @Native public static final int SIZE = 32;
-
-    public static final int BYTES = SIZE / Byte.SIZE;
 
     public static int highestOneBit(int i) {
         return i & (MIN_VALUE >>> numberOfLeadingZeros(i));
@@ -777,10 +756,22 @@ public final class Integer extends Number implements Comparable<Integer> {
         if (i <= 0)
             return i == 0 ? 32 : 0;
         int n = 31;
-        if (i >= 1 << 16) { n -= 16; i >>>= 16; }
-        if (i >= 1 <<  8) { n -=  8; i >>>=  8; }
-        if (i >= 1 <<  4) { n -=  4; i >>>=  4; }
-        if (i >= 1 <<  2) { n -=  2; i >>>=  2; }
+        if (i >= 1 << 16) {
+            n -= 16;
+            i >>>= 16;
+        }
+        if (i >= 1 << 8) {
+            n -= 8;
+            i >>>= 8;
+        }
+        if (i >= 1 << 4) {
+            n -= 4;
+            i >>>= 4;
+        }
+        if (i >= 1 << 2) {
+            n -= 2;
+            i >>>= 2;
+        }
         return n - (i >>> 1);
     }
 
@@ -788,12 +779,29 @@ public final class Integer extends Number implements Comparable<Integer> {
     public static int numberOfTrailingZeros(int i) {
         // HD, Figure 5-14
         int y;
-        if (i == 0) return 32;
+        if (i == 0)
+            return 32;
         int n = 31;
-        y = i <<16; if (y != 0) { n = n -16; i = y; }
-        y = i << 8; if (y != 0) { n = n - 8; i = y; }
-        y = i << 4; if (y != 0) { n = n - 4; i = y; }
-        y = i << 2; if (y != 0) { n = n - 2; i = y; }
+        y = i << 16;
+        if (y != 0) {
+            n = n - 16;
+            i = y;
+        }
+        y = i << 8;
+        if (y != 0) {
+            n = n - 8;
+            i = y;
+        }
+        y = i << 4;
+        if (y != 0) {
+            n = n - 4;
+            i = y;
+        }
+        y = i << 2;
+        if (y != 0) {
+            n = n - 2;
+            i = y;
+        }
         return n - ((i << 1) >>> 31);
     }
 
@@ -832,10 +840,7 @@ public final class Integer extends Number implements Comparable<Integer> {
 
     @HotSpotIntrinsicCandidate
     public static int reverseBytes(int i) {
-        return (i << 24)            |
-               ((i & 0xff00) << 8)  |
-               ((i >>> 8) & 0xff00) |
-               (i >>> 24);
+        return (i << 24) | ((i & 0xff00) << 8) | ((i >>> 8) & 0xff00) | (i >>> 24);
     }
 
     public static int sum(int a, int b) {
@@ -850,5 +855,6 @@ public final class Integer extends Number implements Comparable<Integer> {
         return Math.min(a, b);
     }
 
-    @Native private static final long serialVersionUID = 1360826667806852920L;
+    @Native
+    private static final long serialVersionUID = 1360826667806852920L;
 }
