@@ -56,7 +56,7 @@ public final class String implements java.io.Serializable, Comparable<String>, C
         new ObjectStreamField[0];
 
     /**
-     * ⼀个 String 字符串实际上是⼀个 char 数组。
+     * ⼀个 String 字符串实际上是⼀个 byte 数组。（JDK8是char数组，JDK11是byte数组）
      * 构造方法：String 类的构造⽅法很多。可以通过初始化⼀个字符串，或者字符数组，或者字节数组等等来创建⼀个 String 对象。
      * @author liuzhen
      * @date 2022/4/9 17:25
@@ -391,10 +391,9 @@ public final class String implements java.io.Serializable, Comparable<String>, C
         return isLatin1() ? StringLatin1.compareToUTF16(v1, v2) : StringUTF16.compareToLatin1(v1, v2);
     }
 
-    public static final Comparator<String> CASE_INSENSITIVE_ORDER
-                                         = new CaseInsensitiveComparator();
-    private static class CaseInsensitiveComparator
-            implements Comparator<String>, java.io.Serializable {
+    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
+
+    private static class CaseInsensitiveComparator implements Comparator<String>, java.io.Serializable {
         // use serialVersionUID from JDK 1.2.2 for interoperability
         private static final long serialVersionUID = 8575799808933029326L;
 
@@ -402,15 +401,15 @@ public final class String implements java.io.Serializable, Comparable<String>, C
             byte v1[] = s1.value;
             byte v2[] = s2.value;
             if (s1.coder() == s2.coder()) {
-                return s1.isLatin1() ? StringLatin1.compareToCI(v1, v2)
-                                     : StringUTF16.compareToCI(v1, v2);
+                return s1.isLatin1() ? StringLatin1.compareToCI(v1, v2) : StringUTF16.compareToCI(v1, v2);
             }
-            return s1.isLatin1() ? StringLatin1.compareToCI_UTF16(v1, v2)
-                                 : StringUTF16.compareToCI_Latin1(v1, v2);
+            return s1.isLatin1() ? StringLatin1.compareToCI_UTF16(v1, v2) : StringUTF16.compareToCI_Latin1(v1, v2);
         }
 
         /** Replaces the de-serialized object. */
-        private Object readResolve() { return CASE_INSENSITIVE_ORDER; }
+        private Object readResolve() {
+            return CASE_INSENSITIVE_ORDER;
+        }
     }
 
     public int compareToIgnoreCase(String str) {

@@ -656,7 +656,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     /**
      * 注意：迭代器只能向后遍历，不能向前遍历，能够删除元素，但是不能新增元素。
      */
-    private class Itr implements Iterator<E> {
+        private class Itr implements Iterator<E> {
         // 游标， 下⼀个要返回的元素的索引
         int cursor;
         // 返回最后⼀个元素的索引; 如果没有这样的话返回-1.

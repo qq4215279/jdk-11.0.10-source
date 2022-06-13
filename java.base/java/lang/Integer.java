@@ -41,14 +41,10 @@ import static java.lang.String.UTF16;
  */
 public final class Integer extends Number implements Comparable<Integer> {
 
-    /**
-     * 最小值
-     */
+    /** 最小值 */
     @Native
     public static final int MIN_VALUE = 0x80000000;
-    /**
-     * 最大值
-     */
+    /** 最大值 */
     @Native
     public static final int MAX_VALUE = 0x7fffffff;
 
@@ -61,8 +57,8 @@ public final class Integer extends Number implements Comparable<Integer> {
     /** Class表示原始类型的实例int */
     public static final int BYTES = SIZE / Byte.SIZE;
 
-    static final char[] digits = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
+    static final char[] digits = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+        'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
 
     private static String toStringUTF16(int i, int radix) {
         byte[] buf = new byte[33 * 2];
@@ -241,6 +237,12 @@ public final class Integer extends Number implements Comparable<Integer> {
         return 10 + d;
     }
 
+    /** 
+     *
+     * @date 2022/6/13 21:54 
+     * @param s 
+     * @return int
+     */
     public static int parseInt(String s) throws NumberFormatException {
         // ⾸先调⽤parseInt(s, 10)⽅法，其中s表示我们需要转换的字符串，10表示以⼗进制输出，默认也是10进制
         return parseInt(s, 10);
@@ -547,7 +549,7 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     /**
-     * 这三个⽅法重载，能返回⼀个整型数据所表示的字符串形式，其中最后⼀个⽅法 toString(int,int) 第⼆个参数是表示的进制数。
+     * 这三个⽅法重载，能返回⼀个整型数据所表示的字符串形式，其中最后⼀个⽅法 toString(int, int) 第⼆个参数是表示的进制数。
      *
      * @param
      * @return java.lang.String

@@ -11,7 +11,74 @@
 
 #### Object 
 
+没有被native修饰的方法： equals(Object obj)  finalize()  toString()
 
+1. equals()
+
+   - 在Java规范中，对 equals ⽅法的使⽤必须遵循以下⼏个原则：
+
+     1. ⾃反性：对于任何⾮空引⽤值 x，x.equals(x) 都应返回 true。
+     2. 对称性：对于任何⾮空引⽤值 x 和 y，当且仅当 y.equals(x) 返回 true 时，x.equals(y) 才应返回 true。
+     3. 传递性：对于任何⾮空引⽤值 x、y 和 z，如果 x.equals(y) 返回 true，并且 y.equals(z) 返回true，那么 x.equals(z) 应返回 true。
+     4. ⼀致性：对于任何⾮空引⽤值 x 和 y，多次调⽤ x.equals(y) 始终返回 true 或始终返回 false，前提是对象上 equals ⽐较中所⽤的信息没有被修改。
+     5. 对于任何⾮空引⽤值 x，x.equals(null) 都应返回 false。
+
+   - 所以什么时候使⽤ instanceof 运算符，什么时候使⽤ getClass() 有如下建议：
+
+     1. 如果⼦类能够拥有⾃⼰的相等概念，则对称性需求将强制采⽤ getClass 进⾏检测。
+
+     2. 如果有超类决定相等的概念，那么就可以使⽤ instanceof 进⾏检测，这样可以在不同的⼦类的对象之间进⾏相等的⽐较。
+
+   - Person 类中完整的 equals ⽅法的书写：
+
+     请注意，⽆论何时重写此⽅法，通常都必须重写hashCode()，以维护hashCode()的⼀般约定，该⽅法声明相等对象必须具有相同的哈希代码。
+
+     ```java
+     @Override
+     public boolean equals(Object otherObject) {
+          // 1、判断⽐较的两个对象引⽤是否相等，如果引⽤相等那么表示是同⼀个对象，那么当然相等
+          if(this == otherObject) {
+         	 return true;
+          }
+          // 2、如果 otherObject 为 null，直接返回false，表示不相等
+          if(otherObject == null ) { // 对象为空或者不是Person类的实例
+          	return false;
+          }
+          // 3、⽐较 this 和 otherObject 是否是同⼀个类（注意下⾯两个只能使⽤⼀种）
+          // 3.1：如果 equals 的语义在每个⼦类中所有改变，就使⽤ getClass 检测
+          if(this.getClass() != otherObject.getClass()) {
+          	return false;
+          }
+          // 3.2：如果所有的⼦类都有统⼀的定义，那么使⽤ instanceof 检测
+          if(!(otherObject instanceof Person)) {
+          	return false;
+          }
+          
+          // 4、将 otherObject 转换成对应的类类型变量
+     	 Person other = (Person) otherObject;
+          
+          // 5、最后对对象的属性进⾏⽐较。使⽤ == ⽐较基本类型，使⽤ equals ⽐较对象。如果都相等则返回true，否则返回false
+     	 // 使⽤ Objects ⼯具类的 equals ⽅法防⽌⽐较的两个对象有⼀个为 null⽽报错，因为 null.equals() 是会抛异常的
+          return Objects.equals(this.pname,other.pname) && this.page == other.page;
+      	 // 6、注意如果是在⼦类中定义equals，则要包含 super.equals(other)
+      	 // return super.equals(other) &&
+     	 Objects.equals(this.pname,other.pname) && this.page == other.page;
+      }
+     ```
+
+     
+
+2. getClass()：class是⼀个类的属性，能获取该类编译时的类对象，⽽ getClass()是⼀个类的⽅法，它是获取该类运⾏时的类对象。
+
+   　还有⼀个需要⼤家注意的是，虽然Object类中getClass() ⽅法声明是：`public final native Class getClass();`返回的是⼀个 Class，
+
+   ​	但是如下是能通过编译的：`Class<? extends String> c = "".getClass();`
+
+   ​	也就是说类型为T的变量 getClass() 的返回值类型其实是Class⽽⾮getClass⽅法声明中的Class。
+
+3. hashCode()
+
+4. 
 
 #### Integer
 
@@ -25,9 +92,9 @@
 
 5. **自动拆箱和装箱**
 - Integet.valueOf()
-   
+  
 - intValue()
-   
+  
 6. **equals(Object obj)**
 
 7. **hashCode()** 
@@ -40,21 +107,41 @@
 
 #### String
 
-1.  **String 类的定义**
-2.  **字段属性**
-3.  **构造⽅法**
-4.  **equals(Object anObject)** 
-5.  **hashCode()**
-6.  **charAt(int index)**
-7.  **compareTo(String anotherString) 和 compareToIgnoreCase(String str)** 
-8.  **concat(String str)** 
-9.  **indexOf(int ch) 和 indexOf(int ch, int fromIndex)**
-10.  **split(String regex) 和 split(String regex, int limit)**
-11.  **replace(char oldChar, char newChar) 和 String replaceAll(String regex, String replacement)**
-12.  **substring(int beginIndex)  和 substring(int beginIndex, int endIndex)**
-13.  **常量池**
-14.  **intern()** 
-15.  **String** **真的不可变吗**
+1. **String 类的定义**
+
+2. **字段属性**
+
+   ⽤来存储字符串:
+
+   - JDK8：private final char value[];
+
+   - JDK11：private final byte[] value;
+
+3. **构造⽅法**
+
+4. **equals(Object anObject)** 
+
+5. **hashCode()**
+
+6. **charAt(int index)**
+
+7. **compareTo(String anotherString) 和 compareToIgnoreCase(String str)** 
+
+8. **concat(String str)** 
+
+9. **indexOf(int ch) 和 indexOf(int ch, int fromIndex)**
+
+10. **split(String regex) 和 split(String regex, int limit)**
+
+11. **replace(char oldChar, char newChar) 和 String replaceAll(String regex, String replacement)**
+
+12. **substring(int beginIndex)  和 substring(int beginIndex, int endIndex)**
+
+13. **常量池**
+
+14. **intern()** 
+
+15. **String** **真的不可变吗**
 
 
 
@@ -62,62 +149,97 @@
 
 #### Arrays
 
-1. **asList**
-2. **sort**
-3. **binarySearch**
-4. **copyOf**
-5. **equals 和 deepEquals**
-6. **fill**
-7. **toString** **和** **deepToString**
+1. 4个内部类：
+   1. `ArrayItr` <E> implements Iterator<E>
+   2. `ArrayList` extends AbstractList<E> implements RandomAccess, java.io.Serializable
+   3. LegacyMergeSort
+   4. NaturalOrder
+2. **asList**
+3. **sort**
+4. **binarySearch**
+5. **copyOf**
+6. **equals 和 deepEquals**
+7. **fill**
+8. **toString** **和** **deepToString**
 
 
 
 #### ArrayList
 
-1. **ArrayList** **定义**
-2. **字段属性**
-3. **构造函数**
-4. **添加元素**
+1. 4个内部类：
+
+   1. ArrayListSpliterator
+
+   2. **Itr** implements Iterator<E> 
+
+   3. **ListItr** extends **Itr** implements ListIterator<E>
+
+   4. SubList extends AbstractList<E> implements RandomAccess ：
+
+      返回的是原集合的视图，也就是说，如果对 subList 出来的集合进⾏修改或新增操作，那么原始集合也会发⽣同样的操作。
+
+2. **ArrayList 定义**
+
+3. **字段属性**
+
+4. **构造函数**
+
+5. **添加元素**
    - add()
    - offer
-5. **删除元素**
+
+6. **删除元素**
    - remove(int index)
    - remove(E e)
-6. **修改元素**
+
+7. **修改元素**
+
    - set(int index, E element) 
-7. **查找元素**
+
+8. **查找元素**
+
    - get(int index)
-8. **遍历集合**
+
+9. **遍历集合**
    - **普通** **for** **循环遍历**
    - **迭代器** **iterator**
    - **迭代器的变种** **forEach** 即加强for循环
    - **迭代器** **ListIterator**
-9. **SubList**
-10. **size()**
-11. **isEmpty()**
-12. **trimToSize()**
+
+10. **SubList**
+
+11. **size()**：返回集合的⻓度，⽽不是数组的⻓度，这⾥的 size 就是定义的全局变量。
+
+12. **isEmpty()**
+
+13. **trimToSize()**：该⽅法⽤于回收多余的内存。也就是说⼀旦我们确定集合不在添加多余的元素之后，调⽤trimToSize() ⽅法会将实现集合的数组⼤⼩刚好调整为集合元素的⼤⼩。
 
 
 
 #### LinkedList
 
-1. **LinkedList** **定义**
-2. **字段属性**
-3. **构造函数**
-4. **添加元素**
+1. 4个内部类：
+   1. DescendingIterator implements Iterator<E> 通过适配器模式实现的接⼝，作⽤是倒叙打印链表
+   2. ListItr implements ListIterator<E>
+   3. LLSpliterator
+   4. Node<E>
+2. **LinkedList** **定义**
+3. **字段属性**
+4. **构造函数**
+5. **添加元素**
    - add()
    - offer
-5. **删除元素**
+6. **删除元素**
    - remove(int index)
    - remove(E e)
-6. **修改元素**
+7. **修改元素**
    - set(int index, E element) 
-7. **查找元素**
+8. **查找元素**
    - get(int index)
-8. **遍历集合**
+9. **遍历集合**
    - **普通** **for** **循环**
    - **迭代器**
-9. **迭代器和for循环效率差异**
+10. **迭代器和for循环效率差异**
 
 
 

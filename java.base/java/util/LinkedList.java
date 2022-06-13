@@ -24,7 +24,7 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
 
     /**
      * Node
-     * 注意这⾥出现了⼀个 Node 类，这是 LinkedList 类中的⼀个内部类，其中每⼀个元素就代表⼀个Node 类对象，
+     * 注意这⾥出现了⼀个 Node 类，这是 LinkedList 类中的⼀个内部类，其中每⼀个元素就代表⼀个 Node 类对象，
      * LinkedList 集合就是由许多个 Node 对象类似于⼿拉着⼿构成。
      * @author liuzhen
      * @date 2022/4/9 21:08

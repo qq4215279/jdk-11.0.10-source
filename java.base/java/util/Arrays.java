@@ -315,8 +315,9 @@ public class Arrays {
      */
 
     static final class LegacyMergeSort {
-        private static final boolean userRequested = java.security.AccessController.doPrivileged(
-            new sun.security.action.GetBooleanAction("java.util.Arrays.useLegacyMergeSort")).booleanValue();
+        private static final boolean userRequested = java.security.AccessController
+            .doPrivileged(new sun.security.action.GetBooleanAction("java.util.Arrays.useLegacyMergeSort"))
+            .booleanValue();
     }
 
     public static void sort(Object[] a) {
@@ -654,7 +655,7 @@ public class Arrays {
     // Like public version, but without range checks.
 
     /**
-     *
+     * 二分查找法
      * @param a
      * @param fromIndex
      * @param toIndex
