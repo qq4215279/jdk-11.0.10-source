@@ -245,19 +245,66 @@
 
 #### HashMap
 
-1. **哈希表**
-2. **HashMap 定义**
-3. **字段属性**
-4. **构造函数**
-5. **确定哈希桶数组索引位置**
-6. **添加元素**
+1. 13个内部类
+
+   1. EntryIterator extends HashIterator implements Iterator<Map.Entry<K, V>>
+   2. EntrySet extends AbstractSet<Map.Entry<K, V>>
+   3. EntrySpliterator<K, V>
+   4. HashMapSpliterator
+   5. KeyIterator extends HashIterator implements Iterator<K>
+   6. KeySet
+   7. KeySpliterator<K, V>
+   8. Node<K, V> implements Map.Entry<K, V>
+   9. TreeNode<K, V> extends LinkedHashMap.Entry<K, V>
+   10. ValueIterator extends HashIterator implements Iterator<V>
+   11. Values
+   12. ValueSpliterator<K, V>
+
+2. **哈希表**
+
+   想查找是否存在键值对 Key3-Value3，⾸先通过 Key3 经过**散列函数**，得到值 k3，然后通过 k3 和**散列表**对应的值找到是 Value3。
+
+   ![image-20220614213357232](assets/README/image-20220614213357232.png)
+
+   - 为什么要有散列函数？
+
+     散列函数的存在能够帮助我们更快的确定key和value的映射关系，试想⼀下，如果没有汉字和拼⾳的转换规则（或者汉字和偏旁部⾸的），给你⼀个汉字，你该如何从字典中找到该汉字？我想除了遍历整部字典，你没有什么更好的办法。
+
+   - 多个 key 通过散列函数会得到相同的值，这时候怎么办？
+
+     多个 key 通过散列函数得到相同的值，这其实也是哈希表最⼤的问题——冲突。
+
+     - 开放地址法
+     - 链地址法：我们可以将字典的每⼀⻚都看成是⼀个⼦数组或者⼦链表，当遇到冲突了，直接往当前⻚码的⼦数组或者⼦链表⾥⾯填充即可。那么我们进⾏同⾳字查找的时候，可能需要遍历其⼦数组或者⼦链表。
+
+3. **HashMap 定义**
+
+4. **字段属性**
+
+5. **构造函数**
+
+6. **确定哈希桶数组索引位置**
+
+7. **添加元素**
    - put(K key, V value) 
    - 
-7. **扩容机制**
+
+8. **扩容机制**
+
    - resize(int newCapacity)
-8. **删除元素**
-9. **查找元素**
-10. **遍历元素**
+
+9. **删除元素**
+
+10. **查找元素**
+
+11. **遍历元素**
+
+12. **总结**
+
+    1. 基于JDK1.8的HashMap是由数组+链表+红⿊树组成，当链表⻓度超过 8 时会⾃动转换成红⿊树，当红⿊树节点个数⼩于 6 时，⼜会转化成链表。相对于早期版本的 JDK HashMap 实现，新增了红⿊树作为底层数据结构，在数据量较⼤且哈希碰撞较多时，能够极⼤的增加检索的效率。
+    2. 允许 key 和 value 都为 null。key 重复会被覆盖，value 允许重复。
+    3. ⾮线程安全
+    4. ⽆序（遍历HashMap得到元素的顺序不是按照插⼊的顺序）
 
 
 
@@ -276,12 +323,21 @@
 #### LinkedHashMap
 
 1. **LinkedHashMap 定义**
+
+   LinkedHashMap = HashMap + LinkedList。LinkedHashMap 就是在 HashMap 的基础上多维护了⼀个双向链表，⽤来保证元素迭代顺序。
+
 2. **字段属性**
+
 3. **构造函数**
+
 4. **添加元素**
+
 5. **删除元素**
+
 6. **查找元素**
+
 7. **遍历元素**
+
 8. **迭代器**
 
 
