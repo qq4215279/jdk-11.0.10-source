@@ -37,32 +37,51 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     /**
-     * AQS中利用双向链表和CAS实现了一个阻塞队列
+     * AQS中利用双向链表和CAS实现了一个阻塞队列（CLH队列的节点，代表“等待锁的线程队列”，每个Node都会一个线程对应）
+     * 说明：
+     * Node是CLH队列的节点，代表“等待锁的线程队列”。
+     * 1. 每个Node都会一个线程对应。
+     * 2. 每个Node会通过prev和next分别指向上一个节点和下一个节点，这分别代表上一个等待线程和下一个等待线程。
+     * 3. Node通过waitStatus保存线程的等待状态。
+     * 4. Node通过nextWaiter来区分线程是“独占锁”线程还是“共享锁”线程。如果是“独占锁”线程，则nextWaiter的值为EXCLUSIVE；如果是“共享锁”线程，则nextWaiter的值是SHARED。
      */
     static final class Node {
         static final Node SHARED = new Node();
         static final Node EXCLUSIVE = null;
 
+        // 线程已被取消，对应的waitStatus的值
         static final int CANCELLED = 1;
+        // “当前线程的后继线程需要被unpark(唤醒)”，对应的waitStatus的值。
+        // 一般发生情况是：当前线程的后继线程处于阻塞状态，而当前线程被release或cancel掉，因此需要唤醒当前线程的后继线程。
         static final int SIGNAL = -1;
+        // 线程(处在Condition休眠状态)在等待Condition唤醒，对应的waitStatus的值
         static final int CONDITION = -2;
+        // (共享锁)其它线程获取到“共享锁”，对应的waitStatus的值
         static final int PROPAGATE = -3;
 
+        // waitStatus为“CANCELLED, SIGNAL, CONDITION, PROPAGATE”时分别表示不同状态，
+        // 若waitStatus=0，则意味着当前线程不属于上面的任何一种状态。
         volatile int waitStatus;
 
+        // 前一节点
         volatile Node prev;
-
+        // 后一节点
         volatile Node next;
 
         /** 每个Node对应一个被阻塞的线程 */
         volatile Thread thread;
 
+        // nextWaiter是“区别当前CLH队列是 ‘独占锁’队列 还是 ‘共享锁’队列 的标记”
+        // 若nextWaiter=SHARED，则CLH队列是“独占锁”队列；
+        // 若nextWaiter=EXCLUSIVE，(即nextWaiter=null)，则CLH队列是“共享锁”队列。
         Node nextWaiter;
 
+        // “共享锁”则返回true，“独占锁”则返回false。
         final boolean isShared() {
             return nextWaiter == SHARED;
         }
 
+        // 返回前一节点
         final Node predecessor() {
             Node p = prev;
             if (p == null)
@@ -74,11 +93,13 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         Node() {
         }
 
+        // 构造函数。thread是节点所对应的线程，mode是用来表示thread的锁是“独占锁”还是“共享锁”。
         Node(Node nextWaiter) {
             this.nextWaiter = nextWaiter;
             THREAD.set(this, Thread.currentThread());
         }
 
+        // 构造函数。thread是节点所对应的线程，waitStatus是线程的等待状态。
         Node(int waitStatus) {
             WAITSTATUS.set(this, waitStatus);
             THREAD.set(this, Thread.currentThread());
@@ -528,16 +549,29 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         return tryAcquire(arg) || doAcquireNanos(arg, nanosTimeout);
     }
 
+    /**
+     *
+     * @date 2022/6/17 21:16
+     * @param arg
+     * @return boolean
+     */
     public final boolean release(int arg) {
         if (tryRelease(arg)) {
             Node h = head;
             if (h != null && h.waitStatus != 0)
+                // 唤醒阻塞队列上的第一个
                 unparkSuccessor(h);
             return true;
         }
         return false;
     }
 
+    /**
+     *
+     * @date 2022/6/19 19:04
+     * @param arg
+     * @return void
+     */
     public final void acquireShared(int arg) {
         if (tryAcquireShared(arg) < 0)
             doAcquireShared(arg);
@@ -667,6 +701,12 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         return (h = head) != null && (s = h.next) != null && !s.isShared() && s.thread != null;
     }
 
+    /**
+     * 是通过判断"当前线程"是不是在CLH队列的队首，来返回AQS中是不是有比“当前线程”等待更久的线程。
+     * @date 2022/6/19 18:02
+     * @param
+     * @return boolean
+     */
     public final boolean hasQueuedPredecessors() {
         Node h, s;
         if ((h = head) != null) {
@@ -734,19 +774,21 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
 
     // Internal support methods for Conditions
 
+    /**
+     * 
+     * @date 2022/6/17 21:17
+     * @param node
+     * @return boolean
+     */
     final boolean isOnSyncQueue(Node node) {
+        // 状态为Condition，获取前驱节点为null，返回false
         if (node.waitStatus == Node.CONDITION || node.prev == null)
             return false;
-        if (node.next != null) // If has successor, it must be on queue
+        // 后继节点不为null，肯定在CLH同步队列中，因为如果Node中pre和next变量标记AQS阻塞队列的前驱和后继
+        // nextWaiter记录条件等待队列上的后继，所以next只有在进入到AQS阻塞队列才会设置
+        if (node.next != null)
             return true;
-        /*
-         * node.prev can be non-null, but not yet on queue because
-         * the CAS to place it on queue can fail. So we have to
-         * traverse from tail to make sure it actually made it.  It
-         * will always be near the tail in calls to this method, and
-         * unless the CAS failed (which is unlikely), it will be
-         * there, so we hardly ever traverse much.
-         */
+        // 其他情况，从AQS阻塞队列的队尾开始遍历，查看当前节点是否在阻塞队列中，没想到这是什么情形。。。
         return findNodeFromTail(node);
     }
 
@@ -763,19 +805,18 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
+    /**
+     *
+     * @date 2022/6/17 21:19
+     * @param node
+     * @return boolean
+     */
     final boolean transferForSignal(Node node) {
-        /*
-         * If cannot change waitStatus, the node has been cancelled.
-         */
+        // If cannot change waitStatus, the node has been cancelled.
         if (!node.compareAndSetWaitStatus(Node.CONDITION, 0))
             return false;
 
-        /*
-         * Splice onto queue and try to set waitStatus of predecessor to
-         * indicate that thread is (probably) waiting. If cancelled or
-         * attempt to set waitStatus fails, wake up to resync (in which
-         * case the waitStatus can be transiently and harmlessly wrong).
-         */
+        // 将P加入到AQS阻塞队列中 -- 先把Node放入互斥锁的同步队列中，再调用unpark方法
         Node p = enq(node);
         int ws = p.waitStatus;
         if (ws > 0 || !p.compareAndSetWaitStatus(ws, Node.SIGNAL))
@@ -799,8 +840,15 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         return false;
     }
 
+    /**
+     *
+     * @date 2022/6/17 21:16
+     * @param node
+     * @return int
+     */
     final int fullyRelease(Node node) {
         try {
+            // 获取当前的重入次数
             int savedState = getState();
             if (release(savedState))
                 return savedState;
@@ -835,6 +883,12 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         return condition.getWaitingThreads();
     }
 
+    /**
+     * Condition 实现类
+     * Condition 的所有实现，都在 ConditionObject 类中
+     * @date 2022/6/19 19:49
+     * @return
+     */
     public class ConditionObject implements Condition, java.io.Serializable {
         private static final long serialVersionUID = 1173984872572414699L;
         private transient Node firstWaiter;
@@ -845,6 +899,12 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
 
         // Internal methods
 
+        /**
+         * 总体逻辑就是将Node加入到条件等待队列的队尾
+         * @date 2022/6/17 21:15
+         * @param
+         * @return java.util.concurrent.locks.AbstractQueuedSynchronizer.Node
+         */
         private Node addConditionWaiter() {
             if (!isHeldExclusively())
                 throw new IllegalMonitorStateException();
@@ -855,8 +915,9 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
                 t = lastWaiter;
             }
 
+            // 创建一个新的Node
             Node node = new Node(Node.CONDITION);
-
+            // 如果队列为空，即队列为空时，将node插入到队列中，并且作为队列第一个节点
             if (t == null)
                 firstWaiter = node;
             else
@@ -865,11 +926,18 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
             return node;
         }
 
+        /**
+         * 将队头节点移入到AQS阻塞队列中，并将该节点从条件队列中移除 -- 唤醒队列中的第1个线程
+         * @date 2022/6/17 21:19
+         * @param first
+         * @return void
+         */
         private void doSignal(Node first) {
             do {
                 if ((firstWaiter = first.nextWaiter) == null)
                     lastWaiter = null;
                 first.nextWaiter = null;
+                // transferForSignal()将头节点移动到AQS阻塞队列
             } while (!transferForSignal(first) && (first = firstWaiter) != null);
         }
 
@@ -904,12 +972,23 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
 
         // public methods
 
+        /**
+         * 注意：signal()只是将线程从Condition的条件阻塞队列移动到了AQS的阻塞队列，此时线程并没有被唤醒，只有当持有锁的线程调用了await()方法或者unlock()方法后，
+         * 才会唤醒AQS阻塞队列中被阻塞的线程。而如果不调用signal()，则阻塞在条件队列上的线程永远不可能有机会进入到AQS阻塞队列。
+         * @date 2022/6/17 21:18
+         * @param
+         * @return void
+         */
         public final void signal() {
+            // 判断当前线程是否获取了锁，如果无锁，则抛异常
             if (!isHeldExclusively())
                 throw new IllegalMonitorStateException();
+            // 得到条件阻塞队列的队头
             Node first = firstWaiter;
             if (first != null)
+                // 唤醒队头第一个，不同于AQS的阻塞队列 -- 发起通知
                 doSignal(first);
+            // 从条件阻塞队列唤醒后，还需要加入到AQS队列阻塞中
         }
 
         public final void signalAll() {
@@ -954,22 +1033,51 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
                 selfInterrupt();
         }
 
+        /**
+         * 关于await，有几个关键点要说明：
+         * 1. 线程调用 await()的时候，肯定已经先拿到了锁。所以，在 addConditionWaiter()内部，对这个双向链表的操作不需要执行CAS操作，线程天生是安全的
+         * 2. 在线程执行wait操作之前，必须先释放锁。也就是fullyRelease(node)，否则会发生死锁。这个和wait/notify与synchronized的配合机制一样。
+         * 3. 线程从wait中被唤醒后，必须用acquireQueued(node, savedState)方法重新拿锁。
+         * 4. checkInterruptWhileWaiting(node)代码在park(this)代码之后，是为了检测在park期间是否收到过中断信号。
+         *  当线程从park中醒来时，有两种可能：一种是其他线程调用了unpark，另一种是收到中断信号。这里的await()方法是可以响应中断的，
+         *  所以当发现自己是被中断唤醒的，而不是被unpark唤醒的时，会直接退出while循环，await()方法也会返回。
+         * 5. isOnSyncQueue(node)用于判断该Node是否在AQS的同步队列里面。初始的时候，Node只 在Condition的队列里，而不在AQS的队列里。
+         *  但执行notity操作的时候，会放进AQS的同步队列。
+         * @date 2022/6/17 21:13
+         * @param
+         * @return void
+         */
         public final void await() throws InterruptedException {
+            // 正要执行await，被中断，抛出异常
             if (Thread.interrupted())
                 throw new InterruptedException();
+            // 加入Condition的等待队列中，此时只是Node加入到了队列,线程还未阻塞
             Node node = addConditionWaiter();
+            // 阻塞在Condition之前必须先释放锁，否则会死锁 --释放锁
             int savedState = fullyRelease(node);
             int interruptMode = 0;
+            /*
+            * 检测节点是否在AQS阻塞队列中，如果不在，则唤醒自己也无法争抢锁，继续睡眠
+              此处为假设两个线程，A持有锁，A调用await(),B直接被阻塞，然后A调用await(),让出锁，
+              同时node插入到条件等待队列，且自己不再同步队列中，所以睡眠
+              此时会唤醒B，B获得锁，然后B调用signal(),将A的Node从条件阻塞队列加入到同步队列，
+              然后调用await()，B进入原来A的状态。同时在fullyRelease()函数中唤醒阻塞的第一个线程
+              A醒来后，进行循环判断，判断自己在AQS中，
+            * */
             while (!isOnSyncQueue(node)) {
+                // 自己阻塞自己 -- 阻塞当前线程
                 LockSupport.park(this);
                 if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
                     break;
             }
+            // 被signal()方法唤醒后，要重新尝试获取锁
             if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
                 interruptMode = REINTERRUPT;
             if (node.nextWaiter != null) // clean up if cancelled
+                // 清理条件队列中所有状态不是CONDITION状态的节点
                 unlinkCancelledWaiters();
             if (interruptMode != 0)
+                // 被中断唤醒，抛中断异常
                 reportInterruptAfterWait(interruptMode);
         }
 

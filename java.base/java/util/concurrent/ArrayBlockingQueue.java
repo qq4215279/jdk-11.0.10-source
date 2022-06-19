@@ -73,6 +73,12 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         return (E)items[i];
     }
 
+    /** 
+     *
+     * @date 2022/6/19 19:46 
+     * @param  
+     * @return E
+     */
     private E dequeue() {
         // assert lock.isHeldByCurrentThread();
         // assert lock.getHoldCount() == 1;
@@ -85,6 +91,8 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         count--;
         if (itrs != null)
             itrs.elementDequeued();
+
+        // 消费成功，通知非满条件，队列中有空间，可以生产元素了。
         notFull.signal();
         return e;
     }
@@ -193,6 +201,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         try {
             // 若队列满，则阻塞
             while (count == items.length)
+                // 非满条件阻塞，队列容量已满
                 notFull.await();
             enqueue(e);
         } finally {
@@ -219,6 +228,12 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         }
     }
 
+    /** 
+     *
+     * @date 2022/6/19 19:45 
+     * @param e 
+     * @return void
+     */
     private void enqueue(E e) {
         // assert lock.isHeldByCurrentThread();
         // assert lock.getHoldCount() == 1;
@@ -228,7 +243,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         if (++putIndex == items.length)
             putIndex = 0;
         count++;
-        // 当将数据put 到队列后，通知非空条件
+        // 当将数据 put 到队列后，通知消费者非空条件
         notEmpty.signal();
     }
 
@@ -247,6 +262,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         lock.lockInterruptibly();
         try {
             while (count == 0)
+                // 阻塞于非空条件，队列元素个数为0，无法消费
                 notEmpty.await();
             return dequeue();
         } finally {

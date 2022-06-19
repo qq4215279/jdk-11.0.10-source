@@ -146,6 +146,12 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     static final class NonfairSync extends Sync {
         private static final long serialVersionUID = 7316153563782823691L;
 
+        /**
+         * 尝试获取非公平锁
+         * @date 2022/6/19 17:59
+         * @param acquires
+         * @return boolean
+         */
         protected final boolean tryAcquire(int acquires) {
             return nonfairTryAcquire(acquires);
         }
@@ -160,7 +166,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         private static final long serialVersionUID = -3000897897090466540L;
 
         /**
-         *
+         * 尝试获取公平锁，尝试成功的话，返回true；尝试失败的话，返回false，后续再通过其它办法来获取该锁。
          * @author liuzhen
          * @date 2022/4/17 17:35
          * @param acquires
@@ -168,9 +174,14 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          */
         @ReservedStackAccess
         protected final boolean tryAcquire(int acquires) {
+            // 获取“当前线程”
             final Thread current = Thread.currentThread();
+            // 获取“独占锁”的状态
             int c = getState();
             // 如果state为0，且队列中没有等待线程，则设置当前线程为排他线程，同时设置state的值
+            // 若“锁没有被任何线程锁拥有”，
+            // 则判断“当前线程”是不是CLH队列中的第一个线程线程，
+            // 若是的话，则获取该锁，设置锁的状态，并切设置锁的拥有者为“当前线程”。
             if (c == 0) {
                 if (!hasQueuedPredecessors() && compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
@@ -179,6 +190,8 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             }
             // 如果排他线程就是当前线程，才直接设置state的值
             else if (current == getExclusiveOwnerThread()) {
+                // 如果“独占锁”的拥有者已经为“当前线程”，
+                // 则将更新锁的状态。
                 int nextc = c + acquires;
                 if (nextc < 0)
                     throw new Error("Maximum lock count exceeded");
