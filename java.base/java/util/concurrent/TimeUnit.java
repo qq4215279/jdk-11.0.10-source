@@ -8,6 +8,10 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
+/**
+ *
+ * @date 2022/6/20 20:27
+ */
 public enum TimeUnit {
     /** 纳秒 */
     NANOSECONDS(TimeUnit.NANO_SCALE),
