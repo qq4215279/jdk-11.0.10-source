@@ -1,36 +1,5 @@
 /*
  * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- *
- *
- *
- *
- *
- * Written by Doug Lea with assistance from members of JCP JSR-166
- * Expert Group and released to the public domain, as explained at
- * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
 package java.util.concurrent;
@@ -41,54 +10,19 @@ import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 
 /**
- * A thread managed by a {@link ForkJoinPool}, which executes
- * {@link ForkJoinTask}s.
- * This class is subclassable solely for the sake of adding
- * functionality -- there are no overridable methods dealing with
- * scheduling or execution.  However, you can override initialization
- * and termination methods surrounding the main task processing loop.
- * If you do create such a subclass, you will also need to supply a
- * custom {@link ForkJoinPool.ForkJoinWorkerThreadFactory} to
- * {@linkplain ForkJoinPool#ForkJoinPool(int, ForkJoinWorkerThreadFactory,
- * UncaughtExceptionHandler, boolean, int, int, int, Predicate, long, TimeUnit)
- * use it} in a {@code ForkJoinPool}.
  *
- * @since 1.7
- * @author Doug Lea
+ * @date 2022/6/21 22:26
  */
 public class ForkJoinWorkerThread extends Thread {
-    /*
-     * ForkJoinWorkerThreads are managed by ForkJoinPools and perform
-     * ForkJoinTasks. For explanation, see the internal documentation
-     * of class ForkJoinPool.
-     *
-     * This class just maintains links to its pool and WorkQueue.  The
-     * pool field is set immediately upon construction, but the
-     * workQueue field is not set until a call to registerWorker
-     * completes. This leads to a visibility race, that is tolerated
-     * by requiring that the workQueue field is only accessed by the
-     * owning thread.
-     *
-     * Support for (non-public) subclass InnocuousForkJoinWorkerThread
-     * requires that we break quite a lot of encapsulation (via helper
-     * methods in ThreadLocalRandom) both here and in the subclass to
-     * access and set Thread fields.
-     */
 
-    final ForkJoinPool pool;                // the pool this thread works in
+    /** 当前工作线程所在的线程池，反向引用 */
+    final ForkJoinPool pool; // the pool this thread works in
+    /** 工作队列 */
     final ForkJoinPool.WorkQueue workQueue; // work-stealing mechanics
 
-    /** An AccessControlContext supporting no privileges */
     private static final AccessControlContext INNOCUOUS_ACC =
-        new AccessControlContext(
-            new ProtectionDomain[] { new ProtectionDomain(null, null) });
+        new AccessControlContext(new ProtectionDomain[] {new ProtectionDomain(null, null)});
 
-    /**
-     * Creates a ForkJoinWorkerThread operating in the given pool.
-     *
-     * @param pool the pool this thread works in
-     * @throws NullPointerException if pool is null
-     */
     protected ForkJoinWorkerThread(ForkJoinPool pool) {
         // Use a placeholder until a useful name can be set in registerWorker
         super("aForkJoinWorkerThread");
@@ -96,11 +30,6 @@ public class ForkJoinWorkerThread extends Thread {
         this.workQueue = pool.registerWorker(this);
     }
 
-    /**
-     * Version for use by the default pool.  Supports setting the
-     * context class loader.  This is a separate constructor to avoid
-     * affecting the protected constructor.
-     */
     ForkJoinWorkerThread(ForkJoinPool pool, ClassLoader ccl) {
         super("aForkJoinWorkerThread");
         super.setContextClassLoader(ccl);
@@ -109,13 +38,7 @@ public class ForkJoinWorkerThread extends Thread {
         this.workQueue = pool.registerWorker(this);
     }
 
-    /**
-     * Version for InnocuousForkJoinWorkerThread.
-     */
-    ForkJoinWorkerThread(ForkJoinPool pool,
-                         ClassLoader ccl,
-                         ThreadGroup threadGroup,
-                         AccessControlContext acc) {
+    ForkJoinWorkerThread(ForkJoinPool pool, ClassLoader ccl, ThreadGroup threadGroup, AccessControlContext acc) {
         super(threadGroup, null, "aForkJoinWorkerThread");
         super.setContextClassLoader(ccl);
         ThreadLocalRandom.setInheritedAccessControlContext(this, acc);
@@ -124,62 +47,24 @@ public class ForkJoinWorkerThread extends Thread {
         this.workQueue = pool.registerWorker(this);
     }
 
-    /**
-     * Returns the pool hosting this thread.
-     *
-     * @return the pool
-     */
     public ForkJoinPool getPool() {
         return pool;
     }
 
-    /**
-     * Returns the unique index number of this thread in its pool.
-     * The returned value ranges from zero to the maximum number of
-     * threads (minus one) that may exist in the pool, and does not
-     * change during the lifetime of the thread.  This method may be
-     * useful for applications that track status or collect results
-     * per-worker-thread rather than per-task.
-     *
-     * @return the index number
-     */
     public int getPoolIndex() {
         return workQueue.getPoolIndex();
     }
 
-    /**
-     * Initializes internal state after construction but before
-     * processing any tasks. If you override this method, you must
-     * invoke {@code super.onStart()} at the beginning of the method.
-     * Initialization requires care: Most fields must have legal
-     * default values, to ensure that attempted accesses from other
-     * threads work correctly even before this thread starts
-     * processing tasks.
-     */
-    protected void onStart() {
-    }
+    protected void onStart() {}
 
-    /**
-     * Performs cleanup associated with termination of this worker
-     * thread.  If you override this method, you must invoke
-     * {@code super.onTermination} at the end of the overridden method.
-     *
-     * @param exception the exception causing this thread to abort due
-     * to an unrecoverable error, or {@code null} if completed normally
-     */
-    protected void onTermination(Throwable exception) {
-    }
+    protected void onTermination(Throwable exception) {}
 
-    /**
-     * This method is required to be public, but should never be
-     * called explicitly. It performs the main run loop to execute
-     * {@link ForkJoinTask}s.
-     */
     public void run() {
         if (workQueue.array == null) { // only run once
             Throwable exception = null;
             try {
                 onStart();
+                // 调用runWorker启动线程
                 pool.runWorker(workQueue);
             } catch (Throwable ex) {
                 exception = ex;
@@ -196,35 +81,21 @@ public class ForkJoinWorkerThread extends Thread {
         }
     }
 
-    /**
-     * Non-public hook method for InnocuousForkJoinWorkerThread.
-     */
-    void afterTopLevelExec() {
-    }
+    void afterTopLevelExec() {}
 
-    /**
-     * A worker thread that has no permissions, is not a member of any
-     * user-defined ThreadGroup, uses the system class loader as
-     * thread context class loader, and erases all ThreadLocals after
-     * running each top-level task.
-     */
     static final class InnocuousForkJoinWorkerThread extends ForkJoinWorkerThread {
         /** The ThreadGroup for all InnocuousForkJoinWorkerThreads */
-        private static final ThreadGroup innocuousThreadGroup =
-            AccessController.doPrivileged(new PrivilegedAction<>() {
-                public ThreadGroup run() {
-                    ThreadGroup group = Thread.currentThread().getThreadGroup();
-                    for (ThreadGroup p; (p = group.getParent()) != null; )
-                        group = p;
-                    return new ThreadGroup(
-                        group, "InnocuousForkJoinWorkerThreadGroup");
-                }});
+        private static final ThreadGroup innocuousThreadGroup = AccessController.doPrivileged(new PrivilegedAction<>() {
+            public ThreadGroup run() {
+                ThreadGroup group = Thread.currentThread().getThreadGroup();
+                for (ThreadGroup p; (p = group.getParent()) != null;)
+                    group = p;
+                return new ThreadGroup(group, "InnocuousForkJoinWorkerThreadGroup");
+            }
+        });
 
         InnocuousForkJoinWorkerThread(ForkJoinPool pool) {
-            super(pool,
-                  ClassLoader.getSystemClassLoader(),
-                  innocuousThreadGroup,
-                  INNOCUOUS_ACC);
+            super(pool, ClassLoader.getSystemClassLoader(), innocuousThreadGroup, INNOCUOUS_ACC);
         }
 
         @Override // to erase ThreadLocals
@@ -233,7 +104,7 @@ public class ForkJoinWorkerThread extends Thread {
         }
 
         @Override // to silently fail
-        public void setUncaughtExceptionHandler(UncaughtExceptionHandler x) { }
+        public void setUncaughtExceptionHandler(UncaughtExceptionHandler x) {}
 
         @Override // paranoically
         public void setContextClassLoader(ClassLoader cl) {
