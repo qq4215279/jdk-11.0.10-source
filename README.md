@@ -183,6 +183,13 @@
 
 8. **concat(String str)**： 
 
+   **过程**：
+
+   1. ⾸先判断要拼接的字符串⻓度是否为0，如果为0，则直接返回原字符串。
+   2. 如果不为0，则通过Arrays ⼯具类的copyOf⽅法创建⼀个新的字符数组，⻓度为原字符串和要拼接的字符串之和，前⾯填充原字符串，后⾯为空。
+
+   3. 接着在通过 getChars ⽅法将要拼接的字符串放⼊新字符串后⾯为空的位置。
+
 9. **indexOf(int ch) 和 indexOf(int ch, int fromIndex)**
 
 10. **split(String regex) 和 split(String regex, int limit)**
