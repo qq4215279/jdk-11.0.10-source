@@ -83,27 +83,59 @@
 #### Integer
 
 1. **Integer** **的声明**
-
-2. **主要属性**
-
-3. **构造方法**
-
+2. **主要属性**：
+   1. value:int
+   2. MIN_VALUE、MAX_VALUE、SIZE
+3. **构造方法**：已过期
 4. **toString() toString(int i) toString(int i, int radix)**
-
 5. **自动拆箱和装箱**
-- Integet.valueOf()
+- Integet.valueOf(int i)：
+  - 若`i`满足`IntegerCache.low && IntegerCache.high`，则从`IntegerCache.cache`中取出。
+  - 否则，`new Integer(i)`。
+- intValue()：直接返回 `value` 。
   
-- intValue()
-  
-6. **equals(Object obj)**
+6. **equals(Object obj)**：
 
-7. **hashCode()** 
+   ```java
+   public boolean equals(Object obj) {
+       if (obj instanceof Integer) {
+       return value == ((Integer)obj).intValue();
+       }
+       return false;
+   }
+   ```
+
+7. **hashCode()** ：调用静态方法`hashCode(int value)`，直接返回 `value`。
 
 8. **parseInt(String s)** **和** **parseInt(String s, int radix)** 
 
+   - radix：表示几进制，默认传“10”，十进制。
+
+   过程：
+
+   1. 基本校验：s是否为空；radix < 2 || radix > 36 ；
+
+   2. 判断 s.charAt(0) 为正为负数
+
+   3. 若0位置有正负号，则i从1开始，若无，i则中0位置开始。
+
+   4. while (i < len) { } 通过不断循环，根据进制不断相乘在相加得到⼀个正整数。
+
+      eg：parseInt("2abc",16) = 2 \*16的 3次⽅ + 10 \* 16的2次⽅ + 11 \* 16 + 12 \* 1
+
+      ​		parseInt("123",10) = 1 \* 10的2次⽅ + 2 \* 10 + 3 \* 1
+
 9. **compareTo(Integer anotherInteger) 和 compare(int x, int y)**
 
+   `compareTo(Integer anotherInteger)` 调用 `compare(int x, int y)`，默认升序。
 
+   ```java
+   public static int compare(int x, int y) {
+      return (x < y) ? -1 : ((x == y) ? 0 : 1);
+   }
+   ```
+
+   
 
 #### String
 
@@ -111,7 +143,7 @@
 
 2. **字段属性**
 
-   ⽤来存储字符串:
+   `value[]`：⽤来存储字符串:
 
    - JDK8：private final char value[];
 
@@ -119,15 +151,37 @@
 
 3. **构造⽅法**
 
-4. **equals(Object anObject)** 
+4. **equals(Object anObject)**：⽐较的是组成字符串的每⼀个字符是否相同，如果都相同则返回true，否则返回false。
 
-5. **hashCode()**
+5. **hashCode()**：
 
-6. **charAt(int index)**
+   String 类的 hashCode 算法很简单，主要就是中间的 for 循环，计算公式如下：s[0]31^(n-1) + s[1]31^(n-2) + ... + s[n-1]
 
-7. **compareTo(String anotherString) 和 compareToIgnoreCase(String str)** 
+   s 数组即源码中的 val 数组，也就是构成字符串的字符数组。这⾥有个数字 31 ，为什么选择31作为乘积因⼦，⽽且没有⽤⼀个常量来声明？
 
-8. **concat(String str)** 
+   主要原因有两个：
+
+   * 31是⼀个不⼤不⼩的质数，是作为 hashCode 乘⼦的优选质数之⼀。
+   * 31可以被 JVM 优化，31 * i = (i << 5) - i。因为移位运算⽐乘法运⾏更快更省性能。
+
+6. **charAt(int index)**：
+
+   - JDK8，字符串由字符数组组成，这个⽅法是通过传⼊的索引（数组下标），返回指定索引的单个字符。
+   - JDK11，字符串有字节数组组成
+
+7. **compareTo(String anotherString) 和 compareToIgnoreCase(String str)**：
+
+   - compareTo(String anotherString) ：
+
+     按字⺟顺序⽐较两个字符串，是基于字符串中每个字符的 Unicode 值。
+
+     当两个字符串某个位置的字符不同时，返回的是这⼀位置的字符 Unicode 值之差，当两个字符串都相同时，返回两个字符串⻓度之差。
+
+   - compareToIgnoreCase(String str)：
+
+     compareToIgnoreCase() ⽅法在 compareTo ⽅法的基础上忽略⼤⼩写，我们知道⼤写字⺟是⽐⼩写字⺟的Unicode值⼩32的，底层实现是先都转换成⼤写⽐较，然后都转换成⼩写进⾏⽐较。
+
+8. **concat(String str)**： 
 
 9. **indexOf(int ch) 和 indexOf(int ch, int fromIndex)**
 
