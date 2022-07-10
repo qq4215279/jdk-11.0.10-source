@@ -393,6 +393,9 @@ public final class String implements java.io.Serializable, Comparable<String>, C
 
     public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
 
+    /**
+     * 比较器
+     */
     private static class CaseInsensitiveComparator implements Comparator<String>, java.io.Serializable {
         // use serialVersionUID from JDK 1.2.2 for interoperability
         private static final long serialVersionUID = 8575799808933029326L;

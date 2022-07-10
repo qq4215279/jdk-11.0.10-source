@@ -386,7 +386,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
                 for (; i < size; i++)
                     if (es[i] == null)
                         break found;
-            } else { //不 为null，通过equals⽅法判断对象是否相等
+            } else { // 不为null，通过equals⽅法判断对象是否相等
                 for (; i < size; i++)
                     if (o.equals(es[i]))
                         break found;
