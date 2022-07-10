@@ -13,6 +13,12 @@ import sun.nio.ch.DirectBuffer;
 import java.lang.reflect.Field;
 import java.security.ProtectionDomain;
 
+/**
+ * 原语
+ * @date 2022/6/28 7:56
+ * @param null
+ * @return
+ */
 public final class Unsafe {
 
     private static native void registerNatives();
@@ -26,30 +32,6 @@ public final class Unsafe {
 
     private static final Unsafe theUnsafe = new Unsafe();
 
-    /**
-     * Provides the caller with the capability of performing unsafe
-     * operations.
-     *
-     * <p>The returned {@code Unsafe} object should be carefully guarded
-     * by the caller, since it can be used to read and write data at arbitrary
-     * memory addresses.  It must never be passed to untrusted code.
-     *
-     * <p>Most methods in this class are very low-level, and correspond to a
-     * small number of hardware instructions (on typical machines).  Compilers
-     * are encouraged to optimize these methods accordingly.
-     *
-     * <p>Here is a suggested idiom for using unsafe operations:
-     *
-     * <pre> {@code
-     * class MyTrustedClass {
-     *   private static final Unsafe unsafe = Unsafe.getUnsafe();
-     *   ...
-     *   private long myCountAddress = ...;
-     *   public int getCount() { return unsafe.getByte(myCountAddress); }
-     * }}</pre>
-     * <p>
-     * (It may assist compilers to make the local variable {@code final}.)
-     */
     public static Unsafe getUnsafe() {
         return theUnsafe;
     }
