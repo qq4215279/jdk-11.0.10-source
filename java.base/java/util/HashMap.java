@@ -49,7 +49,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     // 注意：后⾯三个字段是 JDK1.8 新增的，主要是⽤来进⾏红⿊树和链表的互相转换。
-    /**当桶(bucket)上的结点数⼤于这个值时会转成红⿊树(JDK1.8新增) */
+    /** 当桶(bucket)上的结点数⼤于这个值时会转成红⿊树(JDK1.8新增) */
     static final int TREEIFY_THRESHOLD = 8;
 
     /** 当桶(bucket)上的节点数⼩于这个值时会转成链表(JDK1.8新增) */
@@ -1024,9 +1024,9 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             } else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY && oldCap >= DEFAULT_INITIAL_CAPACITY) // 原数组⻓度⼤于等于初始化⻓度16，并且原数组⻓度扩⼤1倍也⼩于2^30次⽅
                 // 阀值扩⼤1倍
                 newThr = oldThr << 1; // double threshold
-        } else if (oldThr > 0)  // 旧阀值⼤于0，则将新容量直接等于就阀值
+        } else if (oldThr > 0) { // 旧阀值⼤于0，则将新容量直接等于就阀值
             newCap = oldThr;
-        else { // 阀值等于0，oldCap也等于0（集合未进⾏初始化）
+        } else { // 阀值等于0，oldCap也等于0（集合未进⾏初始化）
             // 数组⻓度初始化为16
             newCap = DEFAULT_INITIAL_CAPACITY;
             // 阀值等于16*0.75=12
