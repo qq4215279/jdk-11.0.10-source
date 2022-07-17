@@ -18,6 +18,13 @@ import java.util.concurrent.locks.AbstractQueuedSynchronizer;
  * @return
  */
 public class CountDownLatch {
+
+    private final Sync sync;
+
+    /**
+     *
+     * @date 2022/7/15 21:52
+     */
     private static final class Sync extends AbstractQueuedSynchronizer {
         private static final long serialVersionUID = 4982264981922014374L;
 
@@ -52,8 +59,6 @@ public class CountDownLatch {
             }
         }
     }
-
-    private final Sync sync;
 
     public CountDownLatch(int count) {
         if (count < 0)

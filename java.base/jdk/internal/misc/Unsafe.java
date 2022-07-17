@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved. ORACLE PROPRIETARY/CONFIDENTIAL. Use is
+ * subject to license terms.
  */
 
 package jdk.internal.misc;
@@ -15,8 +15,8 @@ import java.security.ProtectionDomain;
 
 /**
  * 原语
+ * 
  * @date 2022/6/28 7:56
- * @param null
  * @return
  */
 public final class Unsafe {
@@ -27,14 +27,34 @@ public final class Unsafe {
         registerNatives();
     }
 
-    private Unsafe() {
-    }
+    private Unsafe() {}
 
     private static final Unsafe theUnsafe = new Unsafe();
 
     public static Unsafe getUnsafe() {
         return theUnsafe;
     }
+
+    /**
+     * 唤醒原语
+     * 
+     * @date 2022/7/13 21:26
+     * @param thread
+     * @return void
+     */
+    @HotSpotIntrinsicCandidate
+    public native void unpark(Object thread);
+
+    /**
+     * 阻塞原语
+     * 
+     * @date 2022/7/13 21:26
+     * @param isAbsolute
+     * @param time
+     * @return void
+     */
+    @HotSpotIntrinsicCandidate
+    public native void park(boolean isAbsolute, long time);
 
     /// peek and poke operations
     /// (compilers should optimize these to memory ops)
@@ -349,7 +369,8 @@ public final class Unsafe {
         checkPrimitivePointer(destBase, destOffset);
     }
 
-    public void copySwapMemory(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes, long elemSize) {
+    public void copySwapMemory(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes,
+        long elemSize) {
         copySwapMemoryChecks(srcBase, srcOffset, destBase, destOffset, bytes, elemSize);
 
         if (bytes == 0) {
@@ -359,7 +380,8 @@ public final class Unsafe {
         copySwapMemory0(srcBase, srcOffset, destBase, destOffset, bytes, elemSize);
     }
 
-    private void copySwapMemoryChecks(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes, long elemSize) {
+    private void copySwapMemoryChecks(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes,
+        long elemSize) {
         checkSize(bytes);
 
         if (elemSize != 2 && elemSize != 4 && elemSize != 8) {
@@ -403,12 +425,12 @@ public final class Unsafe {
         return objectFieldOffset0(f);
     }
 
-    /** 
+    /**
      *
      * @author liuzhen
-     * @date 2022/4/16 19:26 
+     * @date 2022/4/16 19:26
      * @param c
-     * @param name 
+     * @param name
      * @return long
      */
     public long objectFieldOffset(Class<?> c, String name) {
@@ -513,7 +535,8 @@ public final class Unsafe {
 
     /// random trusted operations from JNI:
 
-    public Class<?> defineClass(String name, byte[] b, int off, int len, ClassLoader loader, ProtectionDomain protectionDomain) {
+    public Class<?> defineClass(String name, byte[] b, int off, int len, ClassLoader loader,
+        ProtectionDomain protectionDomain) {
         if (b == null) {
             throw new NullPointerException();
         }
@@ -524,7 +547,8 @@ public final class Unsafe {
         return defineClass0(name, b, off, len, loader, protectionDomain);
     }
 
-    public native Class<?> defineClass0(String name, byte[] b, int off, int len, ClassLoader loader, ProtectionDomain protectionDomain);
+    public native Class<?> defineClass0(String name, byte[] b, int off, int len, ClassLoader loader,
+        ProtectionDomain protectionDomain);
 
     public Class<?> defineAnonymousClass(Class<?> hostClass, byte[] data, Object[] cpPatches) {
         if (hostClass == null || data == null) {
@@ -948,29 +972,34 @@ public final class Unsafe {
 
     @ForceInline
     public final double compareAndExchangeDoubleAcquire(Object o, long offset, double expected, double x) {
-        long w = compareAndExchangeLongAcquire(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
+        long w = compareAndExchangeLongAcquire(o, offset, Double.doubleToRawLongBits(expected),
+            Double.doubleToRawLongBits(x));
         return Double.longBitsToDouble(w);
     }
 
     @ForceInline
     public final double compareAndExchangeDoubleRelease(Object o, long offset, double expected, double x) {
-        long w = compareAndExchangeLongRelease(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
+        long w = compareAndExchangeLongRelease(o, offset, Double.doubleToRawLongBits(expected),
+            Double.doubleToRawLongBits(x));
         return Double.longBitsToDouble(w);
     }
 
     @ForceInline
     public final boolean weakCompareAndSetDoublePlain(Object o, long offset, double expected, double x) {
-        return weakCompareAndSetLongPlain(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
+        return weakCompareAndSetLongPlain(o, offset, Double.doubleToRawLongBits(expected),
+            Double.doubleToRawLongBits(x));
     }
 
     @ForceInline
     public final boolean weakCompareAndSetDoubleAcquire(Object o, long offset, double expected, double x) {
-        return weakCompareAndSetLongAcquire(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
+        return weakCompareAndSetLongAcquire(o, offset, Double.doubleToRawLongBits(expected),
+            Double.doubleToRawLongBits(x));
     }
 
     @ForceInline
     public final boolean weakCompareAndSetDoubleRelease(Object o, long offset, double expected, double x) {
-        return weakCompareAndSetLongRelease(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
+        return weakCompareAndSetLongRelease(o, offset, Double.doubleToRawLongBits(expected),
+            Double.doubleToRawLongBits(x));
     }
 
     @ForceInline
@@ -1249,12 +1278,6 @@ public final class Unsafe {
     public final void putDoubleOpaque(Object o, long offset, double x) {
         putDoubleVolatile(o, offset, x);
     }
-
-    @HotSpotIntrinsicCandidate
-    public native void unpark(Object thread);
-
-    @HotSpotIntrinsicCandidate
-    public native void park(boolean isAbsolute, long time);
 
     public int getLoadAverage(double[] loadavg, int nelems) {
         if (nelems < 0 || nelems > 3 || nelems > loadavg.length) {
@@ -2151,10 +2174,11 @@ public final class Unsafe {
         } else if ((offset & 3) == 0) {
             return makeLong(getInt(o, offset), getInt(o, offset + 4));
         } else if ((offset & 1) == 0) {
-            return makeLong(getShort(o, offset), getShort(o, offset + 2), getShort(o, offset + 4), getShort(o, offset + 6));
+            return makeLong(getShort(o, offset), getShort(o, offset + 2), getShort(o, offset + 4),
+                getShort(o, offset + 6));
         } else {
-            return makeLong(getByte(o, offset), getByte(o, offset + 1), getByte(o, offset + 2), getByte(o, offset + 3), getByte(o, offset + 4),
-                            getByte(o, offset + 5), getByte(o, offset + 6), getByte(o, offset + 7));
+            return makeLong(getByte(o, offset), getByte(o, offset + 1), getByte(o, offset + 2), getByte(o, offset + 3),
+                getByte(o, offset + 4), getByte(o, offset + 5), getByte(o, offset + 6), getByte(o, offset + 7));
         }
     }
 
@@ -2212,8 +2236,8 @@ public final class Unsafe {
         } else if ((offset & 1) == 0) {
             putLongParts(o, offset, (short)(x >>> 0), (short)(x >>> 16), (short)(x >>> 32), (short)(x >>> 48));
         } else {
-            putLongParts(o, offset, (byte)(x >>> 0), (byte)(x >>> 8), (byte)(x >>> 16), (byte)(x >>> 24), (byte)(x >>> 32), (byte)(x >>> 40),
-                         (byte)(x >>> 48), (byte)(x >>> 56));
+            putLongParts(o, offset, (byte)(x >>> 0), (byte)(x >>> 8), (byte)(x >>> 16), (byte)(x >>> 24),
+                (byte)(x >>> 32), (byte)(x >>> 40), (byte)(x >>> 48), (byte)(x >>> 56));
         }
     }
 
@@ -2269,17 +2293,18 @@ public final class Unsafe {
         return BE ? top - pos : pos;
     }
 
-    // These methods construct integers from bytes.  The byte ordering
+    // These methods construct integers from bytes. The byte ordering
     // is the native endianness of this platform.
     private static long makeLong(byte i0, byte i1, byte i2, byte i3, byte i4, byte i5, byte i6, byte i7) {
-        return ((toUnsignedLong(i0) << pickPos(56, 0)) | (toUnsignedLong(i1) << pickPos(56, 8)) | (toUnsignedLong(i2) << pickPos(56, 16)) |
-                (toUnsignedLong(i3) << pickPos(56, 24)) | (toUnsignedLong(i4) << pickPos(56, 32)) | (toUnsignedLong(i5) << pickPos(56, 40)) |
-                (toUnsignedLong(i6) << pickPos(56, 48)) | (toUnsignedLong(i7) << pickPos(56, 56)));
+        return ((toUnsignedLong(i0) << pickPos(56, 0)) | (toUnsignedLong(i1) << pickPos(56, 8))
+            | (toUnsignedLong(i2) << pickPos(56, 16)) | (toUnsignedLong(i3) << pickPos(56, 24))
+            | (toUnsignedLong(i4) << pickPos(56, 32)) | (toUnsignedLong(i5) << pickPos(56, 40))
+            | (toUnsignedLong(i6) << pickPos(56, 48)) | (toUnsignedLong(i7) << pickPos(56, 56)));
     }
 
     private static long makeLong(short i0, short i1, short i2, short i3) {
-        return ((toUnsignedLong(i0) << pickPos(48, 0)) | (toUnsignedLong(i1) << pickPos(48, 16)) | (toUnsignedLong(i2) << pickPos(48, 32)) |
-                (toUnsignedLong(i3) << pickPos(48, 48)));
+        return ((toUnsignedLong(i0) << pickPos(48, 0)) | (toUnsignedLong(i1) << pickPos(48, 16))
+            | (toUnsignedLong(i2) << pickPos(48, 32)) | (toUnsignedLong(i3) << pickPos(48, 48)));
     }
 
     private static long makeLong(int i0, int i1) {
@@ -2291,8 +2316,8 @@ public final class Unsafe {
     }
 
     private static int makeInt(byte i0, byte i1, byte i2, byte i3) {
-        return ((toUnsignedInt(i0) << pickPos(24, 0)) | (toUnsignedInt(i1) << pickPos(24, 8)) | (toUnsignedInt(i2) << pickPos(24, 16)) |
-                (toUnsignedInt(i3) << pickPos(24, 24)));
+        return ((toUnsignedInt(i0) << pickPos(24, 0)) | (toUnsignedInt(i1) << pickPos(24, 8))
+            | (toUnsignedInt(i2) << pickPos(24, 16)) | (toUnsignedInt(i3) << pickPos(24, 24)));
     }
 
     private static short makeShort(byte i0, byte i1) {
@@ -2312,9 +2337,10 @@ public final class Unsafe {
     }
 
     // These methods write integers to memory from smaller parts
-    // provided by their caller.  The ordering in which these parts
+    // provided by their caller. The ordering in which these parts
     // are written is the native endianness of this platform.
-    private void putLongParts(Object o, long offset, byte i0, byte i1, byte i2, byte i3, byte i4, byte i5, byte i6, byte i7) {
+    private void putLongParts(Object o, long offset, byte i0, byte i1, byte i2, byte i3, byte i4, byte i5, byte i6,
+        byte i7) {
         putByte(o, offset + 0, pick(i0, i7));
         putByte(o, offset + 1, pick(i1, i6));
         putByte(o, offset + 2, pick(i2, i5));
@@ -2403,7 +2429,8 @@ public final class Unsafe {
     @HotSpotIntrinsicCandidate
     private native void copyMemory0(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes);
 
-    private native void copySwapMemory0(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes, long elemSize);
+    private native void copySwapMemory0(Object srcBase, long srcOffset, Object destBase, long destOffset, long bytes,
+        long elemSize);
 
     private native long objectFieldOffset0(Field f);
 

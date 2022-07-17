@@ -28,9 +28,10 @@ import jdk.internal.access.SharedSecrets;
 
 /**
  * CopyOnWrite指在“写”的时候，不是直接“写”源数据，而是把数据拷贝一份进行修改，再通过悲观锁或者乐观锁的方式写回。
+ * 那为什么不直接修改，而是要拷贝一份修改呢？
+ * 这是为了在“读”的时候不加锁
  * @author liuzhen
  * @date 2022/4/16 10:32
- * @return
  */
 public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
     private static final long serialVersionUID = 8673264195747942595L;
@@ -68,111 +69,24 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         setArray(Arrays.copyOf(toCopyIn, toCopyIn.length, Object[].class));
     }
 
-    public int size() {
-        return getArray().length;
-    }
-
-    public boolean isEmpty() {
-        return size() == 0;
-    }
-
-    private static int indexOfRange(Object o, Object[] es, int from, int to) {
-        if (o == null) {
-            for (int i = from; i < to; i++)
-                if (es[i] == null)
-                    return i;
-        } else {
-            for (int i = from; i < to; i++)
-                if (o.equals(es[i]))
-                    return i;
-        }
-        return -1;
-    }
-
-    private static int lastIndexOfRange(Object o, Object[] es, int from, int to) {
-        if (o == null) {
-            for (int i = to - 1; i >= from; i--)
-                if (es[i] == null)
-                    return i;
-        } else {
-            for (int i = to - 1; i >= from; i--)
-                if (o.equals(es[i]))
-                    return i;
-        }
-        return -1;
-    }
-
-    public boolean contains(Object o) {
-        return indexOf(o) >= 0;
-    }
-
-    public int indexOf(Object o) {
-        Object[] es = getArray();
-        return indexOfRange(o, es, 0, es.length);
-    }
-
-    public int indexOf(E e, int index) {
-        Object[] es = getArray();
-        return indexOfRange(e, es, index, es.length);
-    }
-
-    public int lastIndexOf(Object o) {
-        Object[] es = getArray();
-        return lastIndexOfRange(o, es, 0, es.length);
-    }
-
-    public int lastIndexOf(E e, int index) {
-        Object[] es = getArray();
-        return lastIndexOfRange(e, es, 0, index + 1);
-    }
-
-    public Object clone() {
-        try {
-            @SuppressWarnings("unchecked") CopyOnWriteArrayList<E> clone = (CopyOnWriteArrayList<E>)super.clone();
-            clone.resetLock();
-            // Unlike in readObject, here we cannot visibility-piggyback on the
-            // volatile write in setArray().
-            VarHandle.releaseFence();
-            return clone;
-        } catch (CloneNotSupportedException e) {
-            // this shouldn't happen, since we are Cloneable
-            throw new InternalError();
-        }
-    }
-
-    public Object[] toArray() {
-        return getArray().clone();
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T[] toArray(T[] a) {
-        Object[] es = getArray();
-        int len = es.length;
-        if (a.length < len)
-            return (T[])Arrays.copyOf(es, len, a.getClass());
-        else {
-            System.arraycopy(es, 0, a, 0, len);
-            if (a.length > len)
-                a[len] = null;
-            return a;
-        }
-    }
-
-    // Positional Access Operations
-
-    @SuppressWarnings("unchecked")
-    static <E> E elementAt(Object[] a, int index) {
-        return (E)a[index];
-    }
-
-    static String outOfBounds(int index, int size) {
-        return "Index: " + index + ", Size: " + size;
-    }
-
+    // ---------------------------------------------------------------->
+    /** 
+     *
+     * @date 2022/7/16 18:03 
+     * @param index 
+     * @return E
+     */
     public E get(int index) {
         return elementAt(getArray(), index);
     }
 
+    /** 
+     *
+     * @date 2022/7/16 18:03 
+     * @param index
+     * @param element 
+     * @return E
+     */
     public E set(int index, E element) {
         synchronized (lock) {
             Object[] es = getArray();
@@ -233,6 +147,99 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         }
     }
 
+    public boolean addIfAbsent(E e) {
+        Object[] snapshot = getArray();
+        return indexOfRange(e, snapshot, 0, snapshot.length) < 0 && addIfAbsent(e, snapshot);
+    }
+    private boolean addIfAbsent(E e, Object[] snapshot) {
+        synchronized (lock) {
+            Object[] current = getArray();
+            int len = current.length;
+            if (snapshot != current) {
+                // Optimize for lost race to another addXXX operation
+                int common = Math.min(snapshot.length, len);
+                for (int i = 0; i < common; i++)
+                    if (current[i] != snapshot[i] && Objects.equals(e, current[i]))
+                        return false;
+                if (indexOfRange(e, current, common, len) >= 0)
+                    return false;
+            }
+            Object[] newElements = Arrays.copyOf(current, len + 1);
+            newElements[len] = e;
+            setArray(newElements);
+            return true;
+        }
+    }
+
+    public int addAllAbsent(Collection<? extends E> c) {
+        Object[] cs = c.toArray();
+        if (c.getClass() != ArrayList.class) {
+            cs = cs.clone();
+        }
+        if (cs.length == 0)
+            return 0;
+        synchronized (lock) {
+            Object[] es = getArray();
+            int len = es.length;
+            int added = 0;
+            // uniquify and compact elements in cs
+            for (int i = 0; i < cs.length; ++i) {
+                Object e = cs[i];
+                if (indexOfRange(e, es, 0, len) < 0 && indexOfRange(e, cs, 0, added) < 0)
+                    cs[added++] = e;
+            }
+            if (added > 0) {
+                Object[] newElements = Arrays.copyOf(es, len + added);
+                System.arraycopy(cs, 0, newElements, len, added);
+                setArray(newElements);
+            }
+            return added;
+        }
+    }
+
+    public boolean addAll(Collection<? extends E> c) {
+        Object[] cs = (c.getClass() == CopyOnWriteArrayList.class) ? ((CopyOnWriteArrayList<?>)c).getArray() : c.toArray();
+        if (cs.length == 0)
+            return false;
+        synchronized (lock) {
+            Object[] es = getArray();
+            int len = es.length;
+            Object[] newElements;
+            if (len == 0 && (c.getClass() == CopyOnWriteArrayList.class || c.getClass() == ArrayList.class)) {
+                newElements = cs;
+            } else {
+                newElements = Arrays.copyOf(es, len + cs.length);
+                System.arraycopy(cs, 0, newElements, len, cs.length);
+            }
+            setArray(newElements);
+            return true;
+        }
+    }
+
+    public boolean addAll(int index, Collection<? extends E> c) {
+        Object[] cs = c.toArray();
+        synchronized (lock) {
+            Object[] es = getArray();
+            int len = es.length;
+            if (index > len || index < 0)
+                throw new IndexOutOfBoundsException(outOfBounds(index, len));
+            if (cs.length == 0)
+                return false;
+            int numMoved = len - index;
+            Object[] newElements;
+            if (numMoved == 0)
+                newElements = Arrays.copyOf(es, len + cs.length);
+            else {
+                newElements = new Object[len + cs.length];
+                System.arraycopy(es, 0, newElements, 0, index);
+                System.arraycopy(es, index, newElements, index + cs.length, numMoved);
+            }
+            System.arraycopy(cs, 0, newElements, index, cs.length);
+            setArray(newElements);
+            return true;
+        }
+    }
+    
     public E remove(int index) {
         synchronized (lock) {
             Object[] es = getArray();
@@ -307,29 +314,58 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         }
     }
 
-    public boolean addIfAbsent(E e) {
-        Object[] snapshot = getArray();
-        return indexOfRange(e, snapshot, 0, snapshot.length) < 0 && addIfAbsent(e, snapshot);
+    public boolean removeAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> c.contains(e));
     }
 
-    private boolean addIfAbsent(E e, Object[] snapshot) {
-        synchronized (lock) {
-            Object[] current = getArray();
-            int len = current.length;
-            if (snapshot != current) {
-                // Optimize for lost race to another addXXX operation
-                int common = Math.min(snapshot.length, len);
-                for (int i = 0; i < common; i++)
-                    if (current[i] != snapshot[i] && Objects.equals(e, current[i]))
-                        return false;
-                if (indexOfRange(e, current, common, len) >= 0)
-                    return false;
-            }
-            Object[] newElements = Arrays.copyOf(current, len + 1);
-            newElements[len] = e;
-            setArray(newElements);
-            return true;
+    @SuppressWarnings("unchecked")
+    static <E> E elementAt(Object[] a, int index) {
+        return (E)a[index];
+    }
+
+    static String outOfBounds(int index, int size) {
+        return "Index: " + index + ", Size: " + size;
+    }
+    // ---------------------------------------------------------------->
+
+
+    public int size() {
+        return getArray().length;
+    }
+
+    public boolean isEmpty() {
+        return size() == 0;
+    }
+
+    private static int indexOfRange(Object o, Object[] es, int from, int to) {
+        if (o == null) {
+            for (int i = from; i < to; i++)
+                if (es[i] == null)
+                    return i;
+        } else {
+            for (int i = from; i < to; i++)
+                if (o.equals(es[i]))
+                    return i;
         }
+        return -1;
+    }
+
+    private static int lastIndexOfRange(Object o, Object[] es, int from, int to) {
+        if (o == null) {
+            for (int i = to - 1; i >= from; i--)
+                if (es[i] == null)
+                    return i;
+        } else {
+            for (int i = to - 1; i >= from; i--)
+                if (o.equals(es[i]))
+                    return i;
+        }
+        return -1;
+    }
+
+    public boolean contains(Object o) {
+        return indexOf(o) >= 0;
     }
 
     public boolean containsAll(Collection<?> c) {
@@ -342,88 +378,62 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         return true;
     }
 
-    public boolean removeAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> c.contains(e));
+    public int indexOf(Object o) {
+        Object[] es = getArray();
+        return indexOfRange(o, es, 0, es.length);
     }
 
-    public boolean retainAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> !c.contains(e));
+    public int indexOf(E e, int index) {
+        Object[] es = getArray();
+        return indexOfRange(e, es, index, es.length);
     }
 
-    public int addAllAbsent(Collection<? extends E> c) {
-        Object[] cs = c.toArray();
-        if (c.getClass() != ArrayList.class) {
-            cs = cs.clone();
-        }
-        if (cs.length == 0)
-            return 0;
-        synchronized (lock) {
-            Object[] es = getArray();
-            int len = es.length;
-            int added = 0;
-            // uniquify and compact elements in cs
-            for (int i = 0; i < cs.length; ++i) {
-                Object e = cs[i];
-                if (indexOfRange(e, es, 0, len) < 0 && indexOfRange(e, cs, 0, added) < 0)
-                    cs[added++] = e;
-            }
-            if (added > 0) {
-                Object[] newElements = Arrays.copyOf(es, len + added);
-                System.arraycopy(cs, 0, newElements, len, added);
-                setArray(newElements);
-            }
-            return added;
+    public int lastIndexOf(Object o) {
+        Object[] es = getArray();
+        return lastIndexOfRange(o, es, 0, es.length);
+    }
+
+    public int lastIndexOf(E e, int index) {
+        Object[] es = getArray();
+        return lastIndexOfRange(e, es, 0, index + 1);
+    }
+
+    public Object clone() {
+        try {
+            @SuppressWarnings("unchecked") CopyOnWriteArrayList<E> clone = (CopyOnWriteArrayList<E>)super.clone();
+            clone.resetLock();
+            // Unlike in readObject, here we cannot visibility-piggyback on the
+            // volatile write in setArray().
+            VarHandle.releaseFence();
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            // this shouldn't happen, since we are Cloneable
+            throw new InternalError();
         }
     }
 
+    public Object[] toArray() {
+        return getArray().clone();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T[] toArray(T[] a) {
+        Object[] es = getArray();
+        int len = es.length;
+        if (a.length < len)
+            return (T[])Arrays.copyOf(es, len, a.getClass());
+        else {
+            System.arraycopy(es, 0, a, 0, len);
+            if (a.length > len)
+                a[len] = null;
+            return a;
+        }
+    }
+
+    
     public void clear() {
         synchronized (lock) {
             setArray(new Object[0]);
-        }
-    }
-
-    public boolean addAll(Collection<? extends E> c) {
-        Object[] cs = (c.getClass() == CopyOnWriteArrayList.class) ? ((CopyOnWriteArrayList<?>)c).getArray() : c.toArray();
-        if (cs.length == 0)
-            return false;
-        synchronized (lock) {
-            Object[] es = getArray();
-            int len = es.length;
-            Object[] newElements;
-            if (len == 0 && (c.getClass() == CopyOnWriteArrayList.class || c.getClass() == ArrayList.class)) {
-                newElements = cs;
-            } else {
-                newElements = Arrays.copyOf(es, len + cs.length);
-                System.arraycopy(cs, 0, newElements, len, cs.length);
-            }
-            setArray(newElements);
-            return true;
-        }
-    }
-
-    public boolean addAll(int index, Collection<? extends E> c) {
-        Object[] cs = c.toArray();
-        synchronized (lock) {
-            Object[] es = getArray();
-            int len = es.length;
-            if (index > len || index < 0)
-                throw new IndexOutOfBoundsException(outOfBounds(index, len));
-            if (cs.length == 0)
-                return false;
-            int numMoved = len - index;
-            Object[] newElements;
-            if (numMoved == 0)
-                newElements = Arrays.copyOf(es, len + cs.length);
-            else {
-                newElements = new Object[len + cs.length];
-                System.arraycopy(es, 0, newElements, 0, index);
-                System.arraycopy(es, index, newElements, index + cs.length, numMoved);
-            }
-            System.arraycopy(cs, 0, newElements, index, cs.length);
-            setArray(newElements);
-            return true;
         }
     }
 
@@ -439,9 +449,7 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         Objects.requireNonNull(filter);
         return bulkRemove(filter);
     }
-
-    // A tiny bit set implementation
-
+    
     private static long[] nBits(int n) {
         return new long[((n - 1) >> 6) + 1];
     }
@@ -492,6 +500,11 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
                 throw new ConcurrentModificationException();
             return false;
         }
+    }
+
+    public boolean retainAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> !c.contains(e));
     }
 
     public void replaceAll(UnaryOperator<E> operator) {
@@ -607,6 +620,37 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         return Spliterators.spliterator(getArray(), Spliterator.IMMUTABLE | Spliterator.ORDERED);
     }
 
+    public List<E> subList(int fromIndex, int toIndex) {
+        synchronized (lock) {
+            Object[] es = getArray();
+            int len = es.length;
+            int size = toIndex - fromIndex;
+            if (fromIndex < 0 || toIndex > len || size < 0)
+                throw new IndexOutOfBoundsException();
+            return new COWSubList(es, fromIndex, size);
+        }
+    }
+
+    private void resetLock() {
+        Field lockField = java.security.AccessController.doPrivileged((java.security.PrivilegedAction<Field>)() -> {
+            try {
+                Field f = CopyOnWriteArrayList.class.getDeclaredField("lock");
+                f.setAccessible(true);
+                return f;
+            } catch (ReflectiveOperationException e) {
+                throw new Error(e);
+            }
+        });
+        try {
+            lockField.set(this, new Object());
+        } catch (IllegalAccessException e) {
+            throw new Error(e);
+        }
+    }
+
+    /**
+     *
+     */
     static final class COWIterator<E> implements ListIterator<E> {
         /**
          * Snapshot of the array
@@ -693,17 +737,9 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         }
     }
 
-    public List<E> subList(int fromIndex, int toIndex) {
-        synchronized (lock) {
-            Object[] es = getArray();
-            int len = es.length;
-            int size = toIndex - fromIndex;
-            if (fromIndex < 0 || toIndex > len || size < 0)
-                throw new IndexOutOfBoundsException();
-            return new COWSubList(es, fromIndex, size);
-        }
-    }
-
+    /**
+     *
+     */
     private class COWSubList implements List<E>, RandomAccess {
         private final int offset;
         private int size;
@@ -1042,6 +1078,9 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
 
     }
 
+    /**
+     *
+     */
     private static class COWSubListIterator<E> implements ListIterator<E> {
         private final ListIterator<E> it;
         private final int offset;
@@ -1105,20 +1144,5 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
         }
     }
 
-    private void resetLock() {
-        Field lockField = java.security.AccessController.doPrivileged((java.security.PrivilegedAction<Field>)() -> {
-            try {
-                Field f = CopyOnWriteArrayList.class.getDeclaredField("lock");
-                f.setAccessible(true);
-                return f;
-            } catch (ReflectiveOperationException e) {
-                throw new Error(e);
-            }
-        });
-        try {
-            lockField.set(this, new Object());
-        } catch (IllegalAccessException e) {
-            throw new Error(e);
-        }
-    }
+
 }

@@ -63,6 +63,13 @@ import java.util.function.Predicate;
 public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<E>, java.io.Serializable {
     private static final long serialVersionUID = 196745693267521676L;
 
+    transient volatile Node<E> head;
+    private transient volatile Node<E> tail;
+
+    /**
+     *
+     * @date 2022/7/16 18:06
+     */
     static final class Node<E> {
         volatile E item;
         volatile Node<E> next;
@@ -75,22 +82,13 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
         }
 
         void appendRelaxed(Node<E> next) {
-            // assert next != null;
-            // assert this.next == null;
             NEXT.set(this, next);
         }
 
         boolean casItem(E cmp, E val) {
-            // assert item == cmp || item == null;
-            // assert cmp != null;
-            // assert val == null;
             return ITEM.compareAndSet(this, cmp, val);
         }
     }
-
-    transient volatile Node<E> head;
-
-    private transient volatile Node<E> tail;
 
     public ConcurrentLinkedQueue() {
         head = tail = new Node<E>();
@@ -111,49 +109,57 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
         tail = t;
     }
 
-    // Have to override just to update the javadoc
+    // ---------------------------------------------------------------->
 
     public boolean add(E e) {
         return offer(e);
     }
 
-    final void updateHead(Node<E> h, Node<E> p) {
-        // assert h != null && p != null && (h == p || h.item == null);
-        if (h != p && HEAD.compareAndSet(this, h, p))
-            NEXT.setRelease(h, h);
-    }
+    public boolean addAll(Collection<? extends E> c) {
+        if (c == this)
+            // As historically specified in AbstractQueue#addAll
+            throw new IllegalArgumentException();
 
-    final Node<E> succ(Node<E> p) {
-        if (p == (p = p.next))
-            p = head;
-        return p;
-    }
-
-    private boolean tryCasSuccessor(Node<E> pred, Node<E> c, Node<E> p) {
-        // assert p != null;
-        // assert c.item == null;
-        // assert c != p;
-        if (pred != null)
-            return NEXT.compareAndSet(pred, c, p);
-        if (HEAD.compareAndSet(this, c, p)) {
-            NEXT.setRelease(c, c);
-            return true;
+        // Copy c into a private chain of Nodes
+        Node<E> beginningOfTheEnd = null, last = null;
+        for (E e : c) {
+            Node<E> newNode = new Node<E>(Objects.requireNonNull(e));
+            if (beginningOfTheEnd == null)
+                beginningOfTheEnd = last = newNode;
+            else
+                last.appendRelaxed(last = newNode);
         }
-        return false;
-    }
+        if (beginningOfTheEnd == null)
+            return false;
 
-    private Node<E> skipDeadNodes(Node<E> pred, Node<E> c, Node<E> p, Node<E> q) {
-        // assert pred != c;
-        // assert p != q;
-        // assert c.item == null;
-        // assert p.item == null;
-        if (q == null) {
-            // Never unlink trailing node.
-            if (c == p)
-                return pred;
-            q = p;
+        // Atomically append the chain at the tail of this collection
+        for (Node<E> t = tail, p = t; ; ) {
+            Node<E> q = p.next;
+            if (q == null) {
+                // p is last node
+                if (NEXT.compareAndSet(p, null, beginningOfTheEnd)) {
+                    // Successful CAS is the linearization point
+                    // for all elements to be added to this queue.
+                    if (!TAIL.weakCompareAndSet(this, t, last)) {
+                        // Try a little harder to update tail,
+                        // since we may be adding many elements.
+                        t = tail;
+                        if (last.next == null)
+                            TAIL.weakCompareAndSet(this, t, last);
+                    }
+                    return true;
+                }
+                // Lost CAS race to another thread; re-read next
+            } else if (p == q)
+                // We have fallen off list.  If tail is unchanged, it
+                // will also be off-list, in which case we need to
+                // jump to head, from which all live nodes are always
+                // reachable.  Else the new tail is a better bet.
+                p = (t != (t = tail)) ? t : head;
+            else
+                // Check for tail updates after two hops.
+                p = (p != t && t != (t = tail)) ? t : q;
         }
-        return (tryCasSuccessor(pred, c, q) && (pred == null || ITEM.get(pred) != null)) ? pred : p;
     }
 
     /**
@@ -195,6 +201,42 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
                 // 后移p指针
                 p = (p != t && t != (t = tail)) ? t : q;
         }
+    }
+
+    public boolean remove(Object o) {
+        if (o == null)
+            return false;
+        restartFromHead:
+        for (; ; ) {
+            for (Node<E> p = head, pred = null; p != null; ) {
+                Node<E> q = p.next;
+                final E item;
+                if ((item = p.item) != null) {
+                    if (o.equals(item) && p.casItem(item, null)) {
+                        skipDeadNodes(pred, p, p, q);
+                        return true;
+                    }
+                    pred = p;
+                    p = q;
+                    continue;
+                }
+                for (Node<E> c = p; ; q = p.next) {
+                    if (q == null || q.item != null) {
+                        pred = skipDeadNodes(pred, c, p, q);
+                        p = q;
+                        break;
+                    }
+                    if (p == (p = q))
+                        continue restartFromHead;
+                }
+            }
+            return false;
+        }
+    }
+
+    public boolean removeAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> c.contains(e));
     }
 
     /**
@@ -247,18 +289,6 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
      * @author liuzhen
      * @date 2022/4/16 11:05
      * @param
-     * @return boolean
-     */
-    public boolean isEmpty() {
-        // 寻找第一个不是null的节点
-        return first() == null;
-    }
-
-    /**
-     *
-     * @author liuzhen
-     * @date 2022/4/16 11:05
-     * @param
      * @return java.util.concurrent.ConcurrentLinkedQueue.Node<E>
      */
     Node<E> first() {
@@ -276,6 +306,20 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
         }
     }
 
+    // ---------------------------------------------------------------->
+
+    /**
+     *
+     * @author liuzhen
+     * @date 2022/4/16 11:05
+     * @param
+     * @return boolean
+     */
+    public boolean isEmpty() {
+        // 寻找第一个不是null的节点
+        return first() == null;
+    }
+
     public int size() {
         restartFromHead:
         for (; ; ) {
@@ -289,6 +333,45 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
             }
             return count;
         }
+    }
+
+    final void updateHead(Node<E> h, Node<E> p) {
+        // assert h != null && p != null && (h == p || h.item == null);
+        if (h != p && HEAD.compareAndSet(this, h, p))
+            NEXT.setRelease(h, h);
+    }
+
+    final Node<E> succ(Node<E> p) {
+        if (p == (p = p.next))
+            p = head;
+        return p;
+    }
+
+    private boolean tryCasSuccessor(Node<E> pred, Node<E> c, Node<E> p) {
+        // assert p != null;
+        // assert c.item == null;
+        // assert c != p;
+        if (pred != null)
+            return NEXT.compareAndSet(pred, c, p);
+        if (HEAD.compareAndSet(this, c, p)) {
+            NEXT.setRelease(c, c);
+            return true;
+        }
+        return false;
+    }
+
+    private Node<E> skipDeadNodes(Node<E> pred, Node<E> c, Node<E> p, Node<E> q) {
+        // assert pred != c;
+        // assert p != q;
+        // assert c.item == null;
+        // assert p.item == null;
+        if (q == null) {
+            // Never unlink trailing node.
+            if (c == p)
+                return pred;
+            q = p;
+        }
+        return (tryCasSuccessor(pred, c, q) && (pred == null || ITEM.get(pred) != null)) ? pred : p;
     }
 
     public boolean contains(Object o) {
@@ -317,84 +400,6 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
                 }
             }
             return false;
-        }
-    }
-
-    public boolean remove(Object o) {
-        if (o == null)
-            return false;
-        restartFromHead:
-        for (; ; ) {
-            for (Node<E> p = head, pred = null; p != null; ) {
-                Node<E> q = p.next;
-                final E item;
-                if ((item = p.item) != null) {
-                    if (o.equals(item) && p.casItem(item, null)) {
-                        skipDeadNodes(pred, p, p, q);
-                        return true;
-                    }
-                    pred = p;
-                    p = q;
-                    continue;
-                }
-                for (Node<E> c = p; ; q = p.next) {
-                    if (q == null || q.item != null) {
-                        pred = skipDeadNodes(pred, c, p, q);
-                        p = q;
-                        break;
-                    }
-                    if (p == (p = q))
-                        continue restartFromHead;
-                }
-            }
-            return false;
-        }
-    }
-
-    public boolean addAll(Collection<? extends E> c) {
-        if (c == this)
-            // As historically specified in AbstractQueue#addAll
-            throw new IllegalArgumentException();
-
-        // Copy c into a private chain of Nodes
-        Node<E> beginningOfTheEnd = null, last = null;
-        for (E e : c) {
-            Node<E> newNode = new Node<E>(Objects.requireNonNull(e));
-            if (beginningOfTheEnd == null)
-                beginningOfTheEnd = last = newNode;
-            else
-                last.appendRelaxed(last = newNode);
-        }
-        if (beginningOfTheEnd == null)
-            return false;
-
-        // Atomically append the chain at the tail of this collection
-        for (Node<E> t = tail, p = t; ; ) {
-            Node<E> q = p.next;
-            if (q == null) {
-                // p is last node
-                if (NEXT.compareAndSet(p, null, beginningOfTheEnd)) {
-                    // Successful CAS is the linearization point
-                    // for all elements to be added to this queue.
-                    if (!TAIL.weakCompareAndSet(this, t, last)) {
-                        // Try a little harder to update tail,
-                        // since we may be adding many elements.
-                        t = tail;
-                        if (last.next == null)
-                            TAIL.weakCompareAndSet(this, t, last);
-                    }
-                    return true;
-                }
-                // Lost CAS race to another thread; re-read next
-            } else if (p == q)
-                // We have fallen off list.  If tail is unchanged, it
-                // will also be off-list, in which case we need to
-                // jump to head, from which all live nodes are always
-                // reachable.  Else the new tail is a better bet.
-                p = (t != (t = tail)) ? t : head;
-            else
-                // Check for tail updates after two hops.
-                p = (p != t && t != (t = tail)) ? t : q;
         }
     }
 
@@ -470,82 +475,6 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
         return new Itr();
     }
 
-    private class Itr implements Iterator<E> {
-        /**
-         * Next node to return item for.
-         */
-        private Node<E> nextNode;
-
-        /**
-         * nextItem holds on to item fields because once we claim
-         * that an element exists in hasNext(), we must return it in
-         * the following next() call even if it was in the process of
-         * being removed when hasNext() was called.
-         */
-        private E nextItem;
-
-        /**
-         * Node of the last returned item, to support remove.
-         */
-        private Node<E> lastRet;
-
-        Itr() {
-            restartFromHead:
-            for (; ; ) {
-                Node<E> h, p, q;
-                for (p = h = head; ; p = q) {
-                    final E item;
-                    if ((item = p.item) != null) {
-                        nextNode = p;
-                        nextItem = item;
-                        break;
-                    } else if ((q = p.next) == null)
-                        break;
-                    else if (p == q)
-                        continue restartFromHead;
-                }
-                updateHead(h, p);
-                return;
-            }
-        }
-
-        public boolean hasNext() {
-            return nextItem != null;
-        }
-
-        public E next() {
-            final Node<E> pred = nextNode;
-            if (pred == null)
-                throw new NoSuchElementException();
-            // assert nextItem != null;
-            lastRet = pred;
-            E item = null;
-
-            for (Node<E> p = succ(pred), q; ; p = q) {
-                if (p == null || (item = p.item) != null) {
-                    nextNode = p;
-                    E x = nextItem;
-                    nextItem = item;
-                    return x;
-                }
-                // unlink deleted nodes
-                if ((q = succ(p)) != null)
-                    NEXT.compareAndSet(pred, p, q);
-            }
-        }
-
-        // Default implementation of forEachRemaining is "good enough".
-
-        public void remove() {
-            Node<E> l = lastRet;
-            if (l == null)
-                throw new IllegalStateException();
-            // rely on a future traversal to relink.
-            l.item = null;
-            lastRet = null;
-        }
-    }
-
     private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
 
         // Write out any hidden stuff
@@ -580,82 +509,6 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
         tail = t;
     }
 
-    final class CLQSpliterator implements Spliterator<E> {
-        static final int MAX_BATCH = 1 << 25;  // max batch array size;
-        Node<E> current;    // current node; null until initialized
-        int batch;          // batch size for splits
-        boolean exhausted;  // true when no more nodes
-
-        public Spliterator<E> trySplit() {
-            Node<E> p, q;
-            if ((p = current()) == null || (q = p.next) == null)
-                return null;
-            int i = 0, n = batch = Math.min(batch + 1, MAX_BATCH);
-            Object[] a = null;
-            do {
-                final E e;
-                if ((e = p.item) != null) {
-                    if (a == null)
-                        a = new Object[n];
-                    a[i++] = e;
-                }
-                if (p == (p = q))
-                    p = first();
-            } while (p != null && (q = p.next) != null && i < n);
-            setCurrent(p);
-            return (i == 0) ? null : Spliterators.spliterator(a, 0, i, (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT));
-        }
-
-        public void forEachRemaining(Consumer<? super E> action) {
-            Objects.requireNonNull(action);
-            final Node<E> p;
-            if ((p = current()) != null) {
-                current = null;
-                exhausted = true;
-                forEachFrom(action, p);
-            }
-        }
-
-        public boolean tryAdvance(Consumer<? super E> action) {
-            Objects.requireNonNull(action);
-            Node<E> p;
-            if ((p = current()) != null) {
-                E e;
-                do {
-                    e = p.item;
-                    if (p == (p = p.next))
-                        p = first();
-                } while (e == null && p != null);
-                setCurrent(p);
-                if (e != null) {
-                    action.accept(e);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void setCurrent(Node<E> p) {
-            if ((current = p) == null)
-                exhausted = true;
-        }
-
-        private Node<E> current() {
-            Node<E> p;
-            if ((p = current) == null && !exhausted)
-                setCurrent(p = first());
-            return p;
-        }
-
-        public long estimateSize() {
-            return Long.MAX_VALUE;
-        }
-
-        public int characteristics() {
-            return (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT);
-        }
-    }
-
     @Override
     public Spliterator<E> spliterator() {
         return new CLQSpliterator();
@@ -664,11 +517,6 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
     public boolean removeIf(Predicate<? super E> filter) {
         Objects.requireNonNull(filter);
         return bulkRemove(filter);
-    }
-
-    public boolean removeAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> c.contains(e));
     }
 
     public boolean retainAll(Collection<?> c) {
@@ -762,6 +610,164 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
             NEXT = l.findVarHandle(Node.class, "next", Node.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    /**
+     *
+     */
+    private class Itr implements Iterator<E> {
+        /**
+         * Next node to return item for.
+         */
+        private Node<E> nextNode;
+
+        /**
+         * nextItem holds on to item fields because once we claim
+         * that an element exists in hasNext(), we must return it in
+         * the following next() call even if it was in the process of
+         * being removed when hasNext() was called.
+         */
+        private E nextItem;
+
+        /**
+         * Node of the last returned item, to support remove.
+         */
+        private Node<E> lastRet;
+
+        Itr() {
+            restartFromHead:
+            for (; ; ) {
+                Node<E> h, p, q;
+                for (p = h = head; ; p = q) {
+                    final E item;
+                    if ((item = p.item) != null) {
+                        nextNode = p;
+                        nextItem = item;
+                        break;
+                    } else if ((q = p.next) == null)
+                        break;
+                    else if (p == q)
+                        continue restartFromHead;
+                }
+                updateHead(h, p);
+                return;
+            }
+        }
+
+        public boolean hasNext() {
+            return nextItem != null;
+        }
+
+        public E next() {
+            final Node<E> pred = nextNode;
+            if (pred == null)
+                throw new NoSuchElementException();
+            // assert nextItem != null;
+            lastRet = pred;
+            E item = null;
+
+            for (Node<E> p = succ(pred), q; ; p = q) {
+                if (p == null || (item = p.item) != null) {
+                    nextNode = p;
+                    E x = nextItem;
+                    nextItem = item;
+                    return x;
+                }
+                // unlink deleted nodes
+                if ((q = succ(p)) != null)
+                    NEXT.compareAndSet(pred, p, q);
+            }
+        }
+
+        // Default implementation of forEachRemaining is "good enough".
+
+        public void remove() {
+            Node<E> l = lastRet;
+            if (l == null)
+                throw new IllegalStateException();
+            // rely on a future traversal to relink.
+            l.item = null;
+            lastRet = null;
+        }
+    }
+
+    /**
+     *
+     */
+    final class CLQSpliterator implements Spliterator<E> {
+        static final int MAX_BATCH = 1 << 25;  // max batch array size;
+        Node<E> current;    // current node; null until initialized
+        int batch;          // batch size for splits
+        boolean exhausted;  // true when no more nodes
+
+        public Spliterator<E> trySplit() {
+            Node<E> p, q;
+            if ((p = current()) == null || (q = p.next) == null)
+                return null;
+            int i = 0, n = batch = Math.min(batch + 1, MAX_BATCH);
+            Object[] a = null;
+            do {
+                final E e;
+                if ((e = p.item) != null) {
+                    if (a == null)
+                        a = new Object[n];
+                    a[i++] = e;
+                }
+                if (p == (p = q))
+                    p = first();
+            } while (p != null && (q = p.next) != null && i < n);
+            setCurrent(p);
+            return (i == 0) ? null : Spliterators.spliterator(a, 0, i, (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT));
+        }
+
+        public void forEachRemaining(Consumer<? super E> action) {
+            Objects.requireNonNull(action);
+            final Node<E> p;
+            if ((p = current()) != null) {
+                current = null;
+                exhausted = true;
+                forEachFrom(action, p);
+            }
+        }
+
+        public boolean tryAdvance(Consumer<? super E> action) {
+            Objects.requireNonNull(action);
+            Node<E> p;
+            if ((p = current()) != null) {
+                E e;
+                do {
+                    e = p.item;
+                    if (p == (p = p.next))
+                        p = first();
+                } while (e == null && p != null);
+                setCurrent(p);
+                if (e != null) {
+                    action.accept(e);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void setCurrent(Node<E> p) {
+            if ((current = p) == null)
+                exhausted = true;
+        }
+
+        private Node<E> current() {
+            Node<E> p;
+            if ((p = current) == null && !exhausted)
+                setCurrent(p = first());
+            return p;
+        }
+
+        public long estimateSize() {
+            return Long.MAX_VALUE;
+        }
+
+        public int characteristics() {
+            return (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT);
         }
     }
 }

@@ -84,6 +84,10 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     private static final ObjectStreamField[] serialPersistentFields = {new ObjectStreamField("segments", Segment[].class), new ObjectStreamField(
         "segmentMask", Integer.TYPE), new ObjectStreamField("segmentShift", Integer.TYPE),};
 
+    /**
+     *
+     * @date 2022/7/16 18:36
+     */
     static class Node<K, V> implements Map.Entry<K, V> {
         final int hash;
         final K key;

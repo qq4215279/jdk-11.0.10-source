@@ -25,6 +25,15 @@ import java.util.function.Predicate;
 
 import jdk.internal.access.SharedSecrets;
 
+/**
+ * PriorityBlockingQueue
+ * 队列通常是先进先出的，而PriorityQueue是按照元素的优先级从小到大出队列的。
+ * 正因为如此，PriorityQueue中的2个元素之间需要可以比较大小，并实现Comparable接口。
+ *
+ * 在阻塞的实现方面，和ArrayBlockingQueue的机制相似，主要区别是用数组实现了一个二叉堆，从而实现按优先级从小到大出队列。
+ * 另一个区别是没有notFull条件，当元素个数超出数组长度时，执行扩容操作。
+ * @date 2022/7/16 15:12
+ */
 @SuppressWarnings("unchecked")
 public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements BlockingQueue<E>, java.io.Serializable {
     private static final long serialVersionUID = 5595510919245408276L;
@@ -43,7 +52,7 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
     private transient Comparator<? super E> comparator;
 
     /**
-     * 1个锁+一个条件，没有非满条件
+     * 1个锁 + 一个条件，没有非满条件
      */
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -96,140 +105,19 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         if (heapify)
             heapify();
     }
-
+    
     private static Object[] ensureNonEmpty(Object[] es) {
         return (es.length > 0) ? es : new Object[1];
     }
 
-    private void tryGrow(Object[] array, int oldCap) {
-        lock.unlock(); // must release and then re-acquire main lock
-        Object[] newArray = null;
-        if (allocationSpinLock == 0 && ALLOCATIONSPINLOCK.compareAndSet(this, 0, 1)) {
-            try {
-                int newCap = oldCap + ((oldCap < 64) ? (oldCap + 2) : // grow faster if small
-                                       (oldCap >> 1));
-                if (newCap - MAX_ARRAY_SIZE > 0) {    // possible overflow
-                    int minCap = oldCap + 1;
-                    if (minCap < 0 || minCap > MAX_ARRAY_SIZE)
-                        throw new OutOfMemoryError();
-                    newCap = MAX_ARRAY_SIZE;
-                }
-                if (newCap > oldCap && queue == array)
-                    newArray = new Object[newCap];
-            } finally {
-                allocationSpinLock = 0;
-            }
-        }
-        if (newArray == null) // back off if another thread is allocating
-            Thread.yield();
-        lock.lock();
-        if (newArray != null && queue == array) {
-            queue = newArray;
-            System.arraycopy(array, 0, newArray, 0, oldCap);
-        }
-    }
+    // ---------------------------------------------------------------->
 
-    /**
+    /** 
      *
-     * @author liuzhen
-     * @date 2022/4/15 23:24
-     * @param
-     * @return E
+     * @date 2022/7/16 15:19 
+     * @param e 
+     * @return boolean
      */
-    private E dequeue() {
-        // assert lock.isHeldByCurrentThread();
-        final Object[] es;
-        final E result;
-
-        // 因为是最小二叉堆，堆顶就是要出队的元素
-        if ((result = (E)((es = queue)[0])) != null) {
-            final int n;
-            final E x = (E)es[(n = --size)];
-            es[n] = null;
-            if (n > 0) {
-                final Comparator<? super E> cmp;
-                if ((cmp = comparator) == null)
-                    // 调整堆，执行siftDown操作
-                    siftDownComparable(0, x, es, n);
-                else
-                    siftDownUsingComparator(0, x, es, n, cmp);
-            }
-        }
-        return result;
-    }
-
-    private static <T> void siftUpComparable(int k, T x, Object[] es) {
-        Comparable<? super T> key = (Comparable<? super T>)x;
-        while (k > 0) {
-            int parent = (k - 1) >>> 1;
-            Object e = es[parent];
-            if (key.compareTo((T)e) >= 0)
-                break;
-            es[k] = e;
-            k = parent;
-        }
-        es[k] = key;
-    }
-
-    private static <T> void siftUpUsingComparator(int k, T x, Object[] es, Comparator<? super T> cmp) {
-        while (k > 0) {
-            int parent = (k - 1) >>> 1;
-            Object e = es[parent];
-            if (cmp.compare(x, (T)e) >= 0)
-                break;
-            es[k] = e;
-            k = parent;
-        }
-        es[k] = x;
-    }
-
-    private static <T> void siftDownComparable(int k, T x, Object[] es, int n) {
-        // assert n > 0;
-        Comparable<? super T> key = (Comparable<? super T>)x;
-        int half = n >>> 1;           // loop while a non-leaf
-        while (k < half) {
-            int child = (k << 1) + 1; // assume left child is least
-            Object c = es[child];
-            int right = child + 1;
-            if (right < n && ((Comparable<? super T>)c).compareTo((T)es[right]) > 0)
-                c = es[child = right];
-            if (key.compareTo((T)c) <= 0)
-                break;
-            es[k] = c;
-            k = child;
-        }
-        es[k] = key;
-    }
-
-    private static <T> void siftDownUsingComparator(int k, T x, Object[] es, int n, Comparator<? super T> cmp) {
-        // assert n > 0;
-        int half = n >>> 1;
-        while (k < half) {
-            int child = (k << 1) + 1;
-            Object c = es[child];
-            int right = child + 1;
-            if (right < n && cmp.compare((T)c, (T)es[right]) > 0)
-                c = es[child = right];
-            if (cmp.compare(x, (T)c) <= 0)
-                break;
-            es[k] = c;
-            k = child;
-        }
-        es[k] = x;
-    }
-
-    private void heapify() {
-        final Object[] es = queue;
-        int n = size, i = (n >>> 1) - 1;
-        final Comparator<? super E> cmp;
-        if ((cmp = comparator) == null)
-            for (; i >= 0; i--)
-                siftDownComparable(i, (E)es[i], es, n);
-        else
-            for (; i >= 0; i--)
-                siftDownUsingComparator(i, (E)es[i], es, n, cmp);
-    }
-
     public boolean add(E e) {
         return offer(e);
     }
@@ -259,6 +147,7 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
             } else { // 元素入堆，即执行siftUp操作
                 siftUpUsingComparator(n, e, es, cmp);
             }
+
             size = n + 1;
             notEmpty.signal();
         } finally {
@@ -267,14 +156,84 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         return true;
     }
 
-    public void put(E e) {
-        offer(e); // never need to block
-    }
-
+    /** 
+     *
+     * @date 2022/7/16 15:19 
+     * @param e
+     * @param timeout
+     * @param unit 
+     * @return boolean
+     */
     public boolean offer(E e, long timeout, TimeUnit unit) {
         return offer(e); // never need to block
     }
 
+    /** 
+     *
+     * @date 2022/7/16 15:19 
+     * @param e 
+     * @return void
+     */
+    public void put(E e) {
+        offer(e); // never need to block
+    }
+
+    /** 
+     *
+     * @date 2022/7/16 15:20 
+     * @param o 
+     * @return boolean
+     */
+    public boolean remove(Object o) {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            int i = indexOf(o);
+            if (i == -1)
+                return false;
+            removeAt(i);
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean removeIf(Predicate<? super E> filter) {
+        Objects.requireNonNull(filter);
+        return bulkRemove(filter);
+    }
+
+    public boolean removeAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> c.contains(e));
+    }
+
+    /** 
+     *
+     * @date 2022/7/16 15:20 
+     * @param  
+     * @return E
+     */
+    public E take() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        E result;
+        try {
+            // 出队列
+            while ((result = dequeue()) == null)
+                notEmpty.await();
+        } finally {
+            lock.unlock();
+        }
+        return result;
+    }
+
+    /** 
+     *
+     * @date 2022/7/16 15:20 
+     * @param  
+     * @return E
+     */
     public E poll() {
         final ReentrantLock lock = this.lock;
         lock.lock();
@@ -285,19 +244,13 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         }
     }
 
-    public E take() throws InterruptedException {
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        E result;
-        try {
-            while ((result = dequeue()) == null)
-                notEmpty.await();
-        } finally {
-            lock.unlock();
-        }
-        return result;
-    }
-
+    /** 
+     *
+     * @date 2022/7/16 15:20 
+     * @param timeout
+     * @param unit 
+     * @return E
+     */
     public E poll(long timeout, TimeUnit unit) throws InterruptedException {
         long nanos = unit.toNanos(timeout);
         final ReentrantLock lock = this.lock;
@@ -312,6 +265,12 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         return result;
     }
 
+    /** 
+     *
+     * @date 2022/7/16 15:20
+     * @param  
+     * @return E
+     */
     public E peek() {
         final ReentrantLock lock = this.lock;
         lock.lock();
@@ -322,9 +281,150 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         }
     }
 
-    public Comparator<? super E> comparator() {
-        return comparator;
+    /**
+     *
+     * @date 2022/7/16 15:15
+     * @param array
+     * @param oldCap
+     * @return void
+     */
+    private void tryGrow(Object[] array, int oldCap) {
+        lock.unlock(); // must release and then re-acquire main lock
+        Object[] newArray = null;
+        if (allocationSpinLock == 0 && ALLOCATIONSPINLOCK.compareAndSet(this, 0, 1)) {
+            try {
+                int newCap = oldCap + ((oldCap < 64) ? (oldCap + 2) : // grow faster if small
+                                       (oldCap >> 1));
+                if (newCap - MAX_ARRAY_SIZE > 0) {    // possible overflow
+                    int minCap = oldCap + 1;
+                    if (minCap < 0 || minCap > MAX_ARRAY_SIZE)
+                        throw new OutOfMemoryError();
+                    newCap = MAX_ARRAY_SIZE;
+                }
+                if (newCap > oldCap && queue == array)
+                    newArray = new Object[newCap];
+            } finally {
+                allocationSpinLock = 0;
+            }
+        }
+        if (newArray == null) // back off if another thread is allocating
+            Thread.yield();
+        lock.lock();
+        if (newArray != null && queue == array) {
+            queue = newArray;
+            System.arraycopy(array, 0, newArray, 0, oldCap);
+        }
     }
+
+    /**
+     * 出队列
+     * @author liuzhen
+     * @date 2022/4/15 23:24
+     * @param
+     * @return E
+     */
+    private E dequeue() {
+        final Object[] es;
+        final E result;
+
+        // 因为是最小二叉堆，堆顶就是要出队的元素
+        if ((result = (E)((es = queue)[0])) != null) {
+            final int n;
+            final E x = (E)es[(n = --size)];
+            es[n] = null;
+            if (n > 0) {
+                final Comparator<? super E> cmp;
+                if ((cmp = comparator) == null)
+                    // 调整堆，执行siftDown操作
+                    siftDownComparable(0, x, es, n);
+                else
+                    siftDownUsingComparator(0, x, es, n, cmp);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 元素下沉 heapify
+     * @date 2022/7/16 15:58
+     * @param
+     * @return void
+     */
+    private void heapify() {
+        final Object[] es = queue;
+        int n = size, i = (n >>> 1) - 1;
+        final Comparator<? super E> cmp;
+        if ((cmp = comparator) == null) {
+            for (; i >= 0; i--) {
+                siftDownComparable(i, (E)es[i], es, n);
+            }
+        } else {
+            for (; i >= 0; i--) {
+                siftDownUsingComparator(i, (E)es[i], es, n, cmp);
+            }
+        }
+    }
+
+    /**
+     * 调整元素，使用默认比较器
+     * @date 2022/7/16 15:57
+     * @param k
+     * @param x
+     * @param es
+     * @param n
+     * @return void
+     */
+    private static <T> void siftDownComparable(int k, T x, Object[] es, int n) {
+        Comparable<? super T> key = (Comparable<? super T>)x;
+        int half = n >>> 1;           // loop while a non-leaf
+        while (k < half) {
+            int child = (k << 1) + 1; // assume left child is least
+            Object c = es[child];
+            int right = child + 1;
+            if (right < n && ((Comparable<? super T>)c).compareTo((T)es[right]) > 0) {
+                c = es[child = right];
+            }
+            if (key.compareTo((T)c) <= 0) {
+                break;
+            }
+
+            es[k] = c;
+            k = child;
+        }
+        es[k] = key;
+    }
+
+    /**
+     * 调整元素，使用配置比较器
+     * @date 2022/7/16 15:58
+     * @param k
+     * @param x
+     * @param es
+     * @param n
+     * @param cmp
+     * @return void
+     */
+    private static <T> void siftDownUsingComparator(int k, T x, Object[] es, int n, Comparator<? super T> cmp) {
+        // assert n > 0;
+        int half = n >>> 1;
+        while (k < half) {
+            int child = (k << 1) + 1;
+            Object c = es[child];
+            int right = child + 1;
+            if (right < n && cmp.compare((T)c, (T)es[right]) > 0) {
+                c = es[child = right];
+            }
+            if (cmp.compare(x, (T)c) <= 0) {
+                break;
+            }
+
+            es[k] = c;
+            k = child;
+        }
+        es[k] = x;
+    }
+
+    // ---------------------------------------------------------------->
 
     public int size() {
         final ReentrantLock lock = this.lock;
@@ -334,6 +434,10 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         } finally {
             lock.unlock();
         }
+    }
+
+    public Comparator<? super E> comparator() {
+        return comparator;
     }
 
     public int remainingCapacity() {
@@ -371,20 +475,6 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
             }
         }
         size = n;
-    }
-
-    public boolean remove(Object o) {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            int i = indexOf(o);
-            if (i == -1)
-                return false;
-            removeAt(i);
-            return true;
-        } finally {
-            lock.unlock();
-        }
     }
 
     void removeEq(Object o) {
@@ -485,46 +575,6 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         return new Itr(toArray());
     }
 
-    final class Itr implements Iterator<E> {
-        final Object[] array; // Array of all elements
-        int cursor;           // index of next element to return
-        int lastRet = -1;     // index of last element, or -1 if no such
-
-        Itr(Object[] array) {
-            this.array = array;
-        }
-
-        public boolean hasNext() {
-            return cursor < array.length;
-        }
-
-        public E next() {
-            if (cursor >= array.length)
-                throw new NoSuchElementException();
-            return (E)array[lastRet = cursor++];
-        }
-
-        public void remove() {
-            if (lastRet < 0)
-                throw new IllegalStateException();
-            removeEq(array[lastRet]);
-            lastRet = -1;
-        }
-
-        public void forEachRemaining(Consumer<? super E> action) {
-            Objects.requireNonNull(action);
-            final Object[] es = array;
-            int i;
-            if ((i = cursor) < es.length) {
-                lastRet = -1;
-                cursor = es.length;
-                for (; i < es.length; i++)
-                    action.accept((E)es[i]);
-                lastRet = es.length - 1;
-            }
-        }
-    }
-
     private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
         lock.lock();
         try {
@@ -551,70 +601,8 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         }
     }
 
-    final class PBQSpliterator implements Spliterator<E> {
-        Object[] array;        // null until late-bound-initialized
-        int index;
-        int fence;
-
-        PBQSpliterator() {
-        }
-
-        PBQSpliterator(Object[] array, int index, int fence) {
-            this.array = array;
-            this.index = index;
-            this.fence = fence;
-        }
-
-        private int getFence() {
-            if (array == null)
-                fence = (array = toArray()).length;
-            return fence;
-        }
-
-        public PBQSpliterator trySplit() {
-            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
-            return (lo >= mid) ? null : new PBQSpliterator(array, lo, index = mid);
-        }
-
-        public void forEachRemaining(Consumer<? super E> action) {
-            Objects.requireNonNull(action);
-            final int hi = getFence(), lo = index;
-            final Object[] es = array;
-            index = hi;                 // ensure exhaustion
-            for (int i = lo; i < hi; i++)
-                action.accept((E)es[i]);
-        }
-
-        public boolean tryAdvance(Consumer<? super E> action) {
-            Objects.requireNonNull(action);
-            if (getFence() > index && index >= 0) {
-                action.accept((E)array[index++]);
-                return true;
-            }
-            return false;
-        }
-
-        public long estimateSize() {
-            return getFence() - index;
-        }
-
-        public int characteristics() {
-            return (Spliterator.NONNULL | Spliterator.SIZED | Spliterator.SUBSIZED);
-        }
-    }
-
     public Spliterator<E> spliterator() {
         return new PBQSpliterator();
-    }
-
-    public boolean removeIf(Predicate<? super E> filter) {
-        Objects.requireNonNull(filter);
-        return bulkRemove(filter);
-    }
-
-    public boolean removeAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> c.contains(e));
     }
 
     public boolean retainAll(Collection<?> c) {
@@ -683,6 +671,31 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
         }
     }
 
+    private static <T> void siftUpComparable(int k, T x, Object[] es) {
+        Comparable<? super T> key = (Comparable<? super T>)x;
+        while (k > 0) {
+            int parent = (k - 1) >>> 1;
+            Object e = es[parent];
+            if (key.compareTo((T)e) >= 0)
+                break;
+            es[k] = e;
+            k = parent;
+        }
+        es[k] = key;
+    }
+
+    private static <T> void siftUpUsingComparator(int k, T x, Object[] es, Comparator<? super T> cmp) {
+        while (k > 0) {
+            int parent = (k - 1) >>> 1;
+            Object e = es[parent];
+            if (cmp.compare(x, (T)e) >= 0)
+                break;
+            es[k] = e;
+            k = parent;
+        }
+        es[k] = x;
+    }
+
     // VarHandle mechanics
     private static final VarHandle ALLOCATIONSPINLOCK;
 
@@ -692,6 +705,104 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E> implements Blocki
             ALLOCATIONSPINLOCK = l.findVarHandle(PriorityBlockingQueue.class, "allocationSpinLock", int.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    /**
+     *
+     */
+    final class Itr implements Iterator<E> {
+        final Object[] array; // Array of all elements
+        int cursor;           // index of next element to return
+        int lastRet = -1;     // index of last element, or -1 if no such
+
+        Itr(Object[] array) {
+            this.array = array;
+        }
+
+        public boolean hasNext() {
+            return cursor < array.length;
+        }
+
+        public E next() {
+            if (cursor >= array.length)
+                throw new NoSuchElementException();
+            return (E)array[lastRet = cursor++];
+        }
+
+        public void remove() {
+            if (lastRet < 0)
+                throw new IllegalStateException();
+            removeEq(array[lastRet]);
+            lastRet = -1;
+        }
+
+        public void forEachRemaining(Consumer<? super E> action) {
+            Objects.requireNonNull(action);
+            final Object[] es = array;
+            int i;
+            if ((i = cursor) < es.length) {
+                lastRet = -1;
+                cursor = es.length;
+                for (; i < es.length; i++)
+                    action.accept((E)es[i]);
+                lastRet = es.length - 1;
+            }
+        }
+    }
+
+    /**
+     *
+     */
+    final class PBQSpliterator implements Spliterator<E> {
+        Object[] array;        // null until late-bound-initialized
+        int index;
+        int fence;
+
+        PBQSpliterator() {
+        }
+
+        PBQSpliterator(Object[] array, int index, int fence) {
+            this.array = array;
+            this.index = index;
+            this.fence = fence;
+        }
+
+        private int getFence() {
+            if (array == null)
+                fence = (array = toArray()).length;
+            return fence;
+        }
+
+        public PBQSpliterator trySplit() {
+            int hi = getFence(), lo = index, mid = (lo + hi) >>> 1;
+            return (lo >= mid) ? null : new PBQSpliterator(array, lo, index = mid);
+        }
+
+        public void forEachRemaining(Consumer<? super E> action) {
+            Objects.requireNonNull(action);
+            final int hi = getFence(), lo = index;
+            final Object[] es = array;
+            index = hi;                 // ensure exhaustion
+            for (int i = lo; i < hi; i++)
+                action.accept((E)es[i]);
+        }
+
+        public boolean tryAdvance(Consumer<? super E> action) {
+            Objects.requireNonNull(action);
+            if (getFence() > index && index >= 0) {
+                action.accept((E)array[index++]);
+                return true;
+            }
+            return false;
+        }
+
+        public long estimateSize() {
+            return getFence() - index;
+        }
+
+        public int characteristics() {
+            return (Spliterator.NONNULL | Spliterator.SIZED | Spliterator.SUBSIZED);
         }
     }
 }

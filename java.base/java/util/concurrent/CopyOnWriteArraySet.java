@@ -14,6 +14,10 @@ import java.util.Spliterators;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+/**
+ * CopyOnWriteArraySet 就是用 Array 实现的一个 Set，保证所有元素都不重复。其内部是封装的一个CopyOnWriteArrayList。
+ * @date 2022/7/16 17:53
+ */
 public class CopyOnWriteArraySet<E> extends AbstractSet<E> implements java.io.Serializable {
     private static final long serialVersionUID = 5457747651344034263L;
 
@@ -33,6 +37,34 @@ public class CopyOnWriteArraySet<E> extends AbstractSet<E> implements java.io.Se
             al.addAllAbsent(c);
         }
     }
+
+    // ---------------------------------------------------------------->
+
+    /**
+     *
+     * @author liuzhen
+     * @date 2022/4/16 10:40
+     * @param e
+     * @return boolean
+     */
+    public boolean add(E e) {
+        // 不重复的加进去
+        return al.addIfAbsent(e);
+    }
+
+    public boolean addAll(Collection<? extends E> c) {
+        return al.addAllAbsent(c) > 0;
+    }
+
+    public boolean remove(Object o) {
+        return al.remove(o);
+    }
+
+    public boolean removeAll(Collection<?> c) {
+        return al.removeAll(c);
+    }
+
+    // ---------------------------------------------------------------->
 
     public int size() {
         return al.size();
@@ -58,33 +90,11 @@ public class CopyOnWriteArraySet<E> extends AbstractSet<E> implements java.io.Se
         al.clear();
     }
 
-    public boolean remove(Object o) {
-        return al.remove(o);
-    }
-
-    /**
-     *
-     * @author liuzhen
-     * @date 2022/4/16 10:40
-     * @param e
-     * @return boolean
-     */
-    public boolean add(E e) {
-        // return al.addIfAbsent(e); // 不
-        return al.addIfAbsent(e);
-    }
-
     public boolean containsAll(Collection<?> c) {
         return (c instanceof Set) ? compareSets(al.getArray(), (Set<?>)c) >= 0 : al.containsAll(c);
     }
 
     private static int compareSets(Object[] snapshot, Set<?> set) {
-        // Uses O(n^2) algorithm, that is only appropriate for small
-        // sets, which CopyOnWriteArraySets should be.
-        //
-        // Optimize up to O(n) if the two sets share a long common prefix,
-        // as might happen if one set was created as a copy of the other set.
-
         final int len = snapshot.length;
         // Mark matched elements to avoid re-checking
         final boolean[] matched = new boolean[len];
@@ -106,14 +116,6 @@ public class CopyOnWriteArraySet<E> extends AbstractSet<E> implements java.io.Se
             return -1;
         }
         return (j == len) ? 0 : 1;
-    }
-
-    public boolean addAll(Collection<? extends E> c) {
-        return al.addAllAbsent(c) > 0;
-    }
-
-    public boolean removeAll(Collection<?> c) {
-        return al.removeAll(c);
     }
 
     public boolean retainAll(Collection<?> c) {

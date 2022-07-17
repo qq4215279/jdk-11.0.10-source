@@ -16,6 +16,7 @@ import jdk.internal.vm.annotation.ReservedStackAccess;
  */
 public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializable {
     private static final long serialVersionUID = -6992448646407690164L;
+
     private final ReentrantReadWriteLock.ReadLock readerLock;
     private final ReentrantReadWriteLock.WriteLock writerLock;
     final Sync sync;
@@ -31,26 +32,6 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
     }
 
     /**
-     * 获取写锁
-     * @date 2022/6/19 19:12
-     * @param
-     * @return java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock
-     */
-    public ReentrantReadWriteLock.WriteLock writeLock() {
-        return writerLock;
-    }
-
-    /**
-     * 获取读锁
-     * @date 2022/6/19 19:12
-     * @param
-     * @return java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock
-     */
-    public ReentrantReadWriteLock.ReadLock readLock() {
-        return readerLock;
-    }
-
-    /**
      *
      * @date 2022/6/19 19:11
      */
@@ -61,6 +42,29 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
         static final int SHARED_UNIT = (1 << SHARED_SHIFT);
         static final int MAX_COUNT = (1 << SHARED_SHIFT) - 1;
         static final int EXCLUSIVE_MASK = (1 << SHARED_SHIFT) - 1;
+
+        private transient ThreadLocalHoldCounter readHolds;
+        private transient HoldCounter cachedHoldCounter;
+
+        private transient Thread firstReader;
+        private transient int firstReaderHoldCount;
+
+        static final class HoldCounter {
+            int count;          // initially 0
+            // Use id, not reference, to avoid garbage retention
+            final long tid = LockSupport.getThreadId(Thread.currentThread());
+        }
+
+        static final class ThreadLocalHoldCounter extends ThreadLocal<HoldCounter> {
+            public HoldCounter initialValue() {
+                return new HoldCounter();
+            }
+        }
+
+        Sync() {
+            readHolds = new ThreadLocalHoldCounter();
+            setState(getState()); // ensures visibility of readHolds
+        }
 
         /**
          * 持有读锁的线程的重入次数
@@ -81,31 +85,6 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
         static int exclusiveCount(int c) {
             return c & EXCLUSIVE_MASK;
         }
-
-        static final class HoldCounter {
-            int count;          // initially 0
-            // Use id, not reference, to avoid garbage retention
-            final long tid = LockSupport.getThreadId(Thread.currentThread());
-        }
-
-        static final class ThreadLocalHoldCounter extends ThreadLocal<HoldCounter> {
-            public HoldCounter initialValue() {
-                return new HoldCounter();
-            }
-        }
-
-        private transient ThreadLocalHoldCounter readHolds;
-
-        private transient HoldCounter cachedHoldCounter;
-
-        private transient Thread firstReader;
-        private transient int firstReaderHoldCount;
-
-        Sync() {
-            readHolds = new ThreadLocalHoldCounter();
-            setState(getState()); // ensures visibility of readHolds
-        }
-
 
         abstract boolean readerShouldBlock();
 
@@ -590,6 +569,26 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
     }
 
     // Instrumentation and status
+
+    /**
+     * 获取读锁
+     * @date 2022/6/19 19:12
+     * @param
+     * @return java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock
+     */
+    public ReentrantReadWriteLock.ReadLock readLock() {
+        return readerLock;
+    }
+
+    /**
+     * 获取写锁
+     * @date 2022/6/19 19:12
+     * @param
+     * @return java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock
+     */
+    public ReentrantReadWriteLock.WriteLock writeLock() {
+        return writerLock;
+    }
 
     public final boolean isFair() {
         return sync instanceof FairSync;

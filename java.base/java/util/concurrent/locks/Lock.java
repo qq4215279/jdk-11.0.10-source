@@ -22,25 +22,31 @@ import java.util.concurrent.TimeUnit;
  */
 public interface Lock {
 
-    /** 
+    /**
+     * 尝试获取锁
+     * @date 2022/7/13 20:53
+     * @param
+     * @return boolean
+     */
+    boolean tryLock();
+
+    boolean tryLock(long time, TimeUnit unit) throws InterruptedException;
+
+    /**
      * 不能被中断
-     * @date 2022/6/18 18:43 
-     * @param  
+     * @date 2022/6/18 18:43
+     * @param
      * @return void
      */
     void lock();
 
-    /** 
+    /**
      * 可以被中断
-     * @date 2022/6/18 18:44 
-     * @param  
+     * @date 2022/6/18 18:44
+     * @param
      * @return void
      */
     void lockInterruptibly() throws InterruptedException;
-
-    boolean tryLock();
-
-    boolean tryLock(long time, TimeUnit unit) throws InterruptedException;
 
     /** 
      * 不能被中断

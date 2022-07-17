@@ -47,6 +47,7 @@ import java.util.concurrent.locks.AbstractQueuedSynchronizer;
  */
 public class Semaphore implements java.io.Serializable {
     private static final long serialVersionUID = -3222578661600680210L;
+
     private final Sync sync;
 
     /**
@@ -110,8 +111,6 @@ public class Semaphore implements java.io.Serializable {
      * 非公平锁
      * @author liuzhen
      * @date 2022/4/16 17:47
-     * @param null
-     * @return
      */
     static final class NonfairSync extends Sync {
         private static final long serialVersionUID = -2694183684443567898L;
@@ -129,7 +128,6 @@ public class Semaphore implements java.io.Serializable {
      * 公平锁
      * @author liuzhen
      * @date 2022/4/16 17:46
-     * @return
      */
     static final class FairSync extends Sync {
         private static final long serialVersionUID = 2014338818796000944L;

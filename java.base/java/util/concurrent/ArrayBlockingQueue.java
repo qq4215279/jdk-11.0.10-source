@@ -18,120 +18,30 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+/**
+ * ArrayBlockingQueue
+ * @date 2022/7/16 13:35
+ */
 public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQueue<E>, java.io.Serializable {
 
     private static final long serialVersionUID = -817911632652898426L;
 
+    /** 存储ArrayBlockingQueue集合元素 */
     final Object[] items;
 
-    /**
-     * 队头指针
-     */
+    /** 队头指针 */
     int takeIndex;
-    /**
-     * 队尾指针
-     */
+    /** 队尾指针 */
     int putIndex;
 
     int count;
 
-    /*
-     * Concurrency control uses the classic two-condition algorithm
-     * found in any textbook.
-     */
-
-    /**
-     * 核心为1个锁外加两个条件
-     */
+    /** 核心为1个锁外加两个条件 */
     final ReentrantLock lock;
     private final Condition notEmpty;
     private final Condition notFull;
 
     transient Itrs itrs;
-
-    // Internal helper methods
-
-    static final int inc(int i, int modulus) {
-        if (++i >= modulus)
-            i = 0;
-        return i;
-    }
-
-    static final int dec(int i, int modulus) {
-        if (--i < 0)
-            i = modulus - 1;
-        return i;
-    }
-
-    @SuppressWarnings("unchecked")
-    final E itemAt(int i) {
-        return (E)items[i];
-    }
-
-    @SuppressWarnings("unchecked")
-    static <E> E itemAt(Object[] items, int i) {
-        return (E)items[i];
-    }
-
-    /** 
-     *
-     * @date 2022/6/19 19:46 
-     * @param  
-     * @return E
-     */
-    private E dequeue() {
-        // assert lock.isHeldByCurrentThread();
-        // assert lock.getHoldCount() == 1;
-        // assert items[takeIndex] != null;
-        final Object[] items = this.items;
-        @SuppressWarnings("unchecked") E e = (E)items[takeIndex];
-        items[takeIndex] = null;
-        if (++takeIndex == items.length)
-            takeIndex = 0;
-        count--;
-        if (itrs != null)
-            itrs.elementDequeued();
-
-        // 消费成功，通知非满条件，队列中有空间，可以生产元素了。
-        notFull.signal();
-        return e;
-    }
-
-    void removeAt(final int removeIndex) {
-        // assert lock.isHeldByCurrentThread();
-        // assert lock.getHoldCount() == 1;
-        // assert items[removeIndex] != null;
-        // assert removeIndex >= 0 && removeIndex < items.length;
-        final Object[] items = this.items;
-        if (removeIndex == takeIndex) {
-            // removing front item; just advance
-            items[takeIndex] = null;
-            if (++takeIndex == items.length)
-                takeIndex = 0;
-            count--;
-            if (itrs != null)
-                itrs.elementDequeued();
-        } else {
-            // an "interior" remove
-
-            // slide over all others up through putIndex.
-            for (int i = removeIndex, putIndex = this.putIndex; ; ) {
-                int pred = i;
-                if (++i == items.length)
-                    i = 0;
-                if (i == putIndex) {
-                    items[pred] = null;
-                    this.putIndex = pred;
-                    break;
-                }
-                items[pred] = items[i];
-            }
-            count--;
-            if (itrs != null)
-                itrs.removedAt(removeIndex);
-        }
-        notFull.signal();
-    }
 
     public ArrayBlockingQueue(int capacity) {
         this(capacity, false);
@@ -167,10 +77,25 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         }
     }
 
+    // ---------------------------------------------------------------->
+
+    /**
+     * 添加元素，
+     * 过程：调用父类 add(E e) ，父类在调用 offer(E e)
+     * @date 2022/7/16 13:46
+     * @param e
+     * @return boolean
+     */
     public boolean add(E e) {
         return super.add(e);
     }
 
+    /**
+     *
+     * @date 2022/7/16 13:47
+     * @param e
+     * @return boolean
+     */
     public boolean offer(E e) {
         Objects.requireNonNull(e);
         final ReentrantLock lock = this.lock;
@@ -182,6 +107,33 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
                 enqueue(e);
                 return true;
             }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     *
+     * @date 2022/7/16 13:48
+     * @param e
+     * @param timeout
+     * @param unit
+     * @return boolean
+     */
+    public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
+        Objects.requireNonNull(e);
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (count == items.length) {
+                if (nanos <= 0L)
+                    return false;
+                nanos = notFull.awaitNanos(nanos);
+            }
+
+            enqueue(e);
+            return true;
         } finally {
             lock.unlock();
         }
@@ -203,35 +155,17 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             while (count == items.length)
                 // 非满条件阻塞，队列容量已满
                 notFull.await();
+
             enqueue(e);
         } finally {
             lock.unlock();
         }
     }
 
-    public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
-
-        Objects.requireNonNull(e);
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            while (count == items.length) {
-                if (nanos <= 0L)
-                    return false;
-                nanos = notFull.awaitNanos(nanos);
-            }
-            enqueue(e);
-            return true;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /** 
-     *
-     * @date 2022/6/19 19:45 
-     * @param e 
+    /**
+     * 进队列
+     * @date 2022/6/19 19:45
+     * @param e
      * @return void
      */
     private void enqueue(E e) {
@@ -247,79 +181,12 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         notEmpty.signal();
     }
 
-    public E poll() {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return (count == 0) ? null : dequeue();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public E take() throws InterruptedException {
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            while (count == 0)
-                // 阻塞于非空条件，队列元素个数为0，无法消费
-                notEmpty.await();
-            return dequeue();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public E poll(long timeout, TimeUnit unit) throws InterruptedException {
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            while (count == 0) {
-                if (nanos <= 0L)
-                    return null;
-                nanos = notEmpty.awaitNanos(nanos);
-            }
-            return dequeue();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public E peek() {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return itemAt(takeIndex); // null when queue is empty
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    // this doc comment is overridden to remove the reference to collections
-    // greater in size than Integer.MAX_VALUE
-    public int size() {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return count;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    // this doc comment is a modified copy of the inherited doc comment,
-    // without the reference to unlimited queues.
-    public int remainingCapacity() {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return items.length - count;
-        } finally {
-            lock.unlock();
-        }
-    }
-
+    /**
+     *
+     * @date 2022/7/16 14:05
+     * @param o
+     * @return boolean
+     */
     public boolean remove(Object o) {
         if (o == null)
             return false;
@@ -339,6 +206,127 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
                 }
             }
             return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     *
+     * @date 2022/7/16 14:08
+     * @param
+     * @return E
+     */
+    public E take() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (count == 0)
+                // 阻塞于非空条件，队列元素个数为0，无法消费
+                notEmpty.await();
+            return dequeue();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     *
+     * @date 2022/7/16 14:09
+     * @param
+     * @return E
+     */
+    public E poll() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return (count == 0) ? null : dequeue();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     *
+     * @date 2022/7/16 14:09
+     * @param timeout
+     * @param unit
+     * @return E
+     */
+    public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (count == 0) {
+                if (nanos <= 0L)
+                    return null;
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+            return dequeue();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 获取队首元素，但不出队列
+     * @date 2022/7/16 14:09
+     * @param
+     * @return E
+     */
+    public E peek() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return itemAt(takeIndex); // null when queue is empty
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 出队列
+     * @date 2022/6/19 19:46
+     * @param
+     * @return E
+     */
+    private E dequeue() {
+        final Object[] items = this.items;
+        @SuppressWarnings("unchecked")
+        E e = (E)items[takeIndex];
+        // 将当前元素置为空
+        items[takeIndex] = null;
+
+        if (++takeIndex == items.length) {
+            takeIndex = 0;
+        }
+        count--;
+        if (itrs != null)
+            itrs.elementDequeued();
+
+        // 消费成功，通知非满条件，队列中有空间，可以生产元素了。
+        notFull.signal();
+        return e;
+    }
+
+    // ---------------------------------------------------------------->
+
+    public int size() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return count;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public int remainingCapacity() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return items.length - count;
         } finally {
             lock.unlock();
         }
@@ -489,6 +477,224 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         return new Itr();
     }
 
+    public Spliterator<E> spliterator() {
+        return Spliterators.spliterator(this, (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT));
+    }
+
+    public void forEach(Consumer<? super E> action) {
+        Objects.requireNonNull(action);
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            if (count > 0) {
+                final Object[] items = this.items;
+                for (int i = takeIndex, end = putIndex, to = (i < end) ? end : items.length; ; i = 0, to = end) {
+                    for (; i < to; i++)
+                        action.accept(itemAt(items, i));
+                    if (to == end)
+                        break;
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean removeIf(Predicate<? super E> filter) {
+        Objects.requireNonNull(filter);
+        return bulkRemove(filter);
+    }
+
+    public boolean removeAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> c.contains(e));
+    }
+
+    public boolean retainAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> !c.contains(e));
+    }
+
+    private boolean bulkRemove(Predicate<? super E> filter) {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            if (itrs == null) { // check for active iterators
+                if (count > 0) {
+                    final Object[] items = this.items;
+                    // Optimize for initial run of survivors
+                    for (int i = takeIndex, end = putIndex, to = (i < end) ? end : items.length; ; i = 0, to = end) {
+                        for (; i < to; i++)
+                            if (filter.test(itemAt(items, i)))
+                                return bulkRemoveModified(filter, i);
+                        if (to == end)
+                            break;
+                    }
+                }
+                return false;
+            }
+        } finally {
+            lock.unlock();
+        }
+        // Active iterators are too hairy!
+        // Punting (for now) to the slow n^2 algorithm ...
+        return super.removeIf(filter);
+    }
+
+    // A tiny bit set implementation
+
+    private static long[] nBits(int n) {
+        return new long[((n - 1) >> 6) + 1];
+    }
+
+    private static void setBit(long[] bits, int i) {
+        bits[i >> 6] |= 1L << i;
+    }
+
+    private static boolean isClear(long[] bits, int i) {
+        return (bits[i >> 6] & (1L << i)) == 0;
+    }
+
+    private int distanceNonEmpty(int i, int j) {
+        if ((j -= i) <= 0)
+            j += items.length;
+        return j;
+    }
+
+    private boolean bulkRemoveModified(Predicate<? super E> filter, final int beg) {
+        final Object[] es = items;
+        final int capacity = items.length;
+        final int end = putIndex;
+        final long[] deathRow = nBits(distanceNonEmpty(beg, putIndex));
+        deathRow[0] = 1L;   // set bit 0
+        for (int i = beg + 1, to = (i <= end) ? end : es.length, k = beg; ; i = 0, to = end, k -= capacity) {
+            for (; i < to; i++)
+                if (filter.test(itemAt(es, i)))
+                    setBit(deathRow, i - k);
+            if (to == end)
+                break;
+        }
+        // a two-finger traversal, with hare i reading, tortoise w writing
+        int w = beg;
+        for (int i = beg + 1, to = (i <= end) ? end : es.length, k = beg; ; w = 0) { // w rejoins i on second leg
+            // In this loop, i and w are on the same leg, with i > w
+            for (; i < to; i++)
+                if (isClear(deathRow, i - k))
+                    es[w++] = es[i];
+            if (to == end)
+                break;
+            // In this loop, w is on the first leg, i on the second
+            for (i = 0, to = end, k -= capacity; i < to && w < capacity; i++)
+                if (isClear(deathRow, i - k))
+                    es[w++] = es[i];
+            if (i >= to) {
+                if (w == capacity)
+                    w = 0; // "corner" case
+                break;
+            }
+        }
+        count -= distanceNonEmpty(w, end);
+        circularClear(es, putIndex = w, end);
+        return true;
+    }
+
+    void checkInvariants() {
+        // meta-assertions
+        // assert lock.isHeldByCurrentThread();
+        if (!invariantsSatisfied()) {
+            String detail = String.format("takeIndex=%d putIndex=%d count=%d capacity=%d items=%s", takeIndex, putIndex, count, items.length,
+                                          Arrays.toString(items));
+            System.err.println(detail);
+            throw new AssertionError(detail);
+        }
+    }
+
+    private boolean invariantsSatisfied() {
+        int capacity = items.length;
+        return capacity > 0 && items.getClass() == Object[].class && (takeIndex | putIndex | count) >= 0 && takeIndex < capacity &&
+               putIndex < capacity && count <= capacity && (putIndex - takeIndex - count) % capacity == 0 &&
+               (count == 0 || items[takeIndex] != null) && (count == capacity || items[putIndex] == null) && (count == 0 || items[dec(putIndex,
+                                                                                                                                      capacity)] !=
+                                                                                                                            null);
+    }
+
+    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+        // Read in items array and various fields
+        s.defaultReadObject();
+
+        if (!invariantsSatisfied())
+            throw new java.io.InvalidObjectException("invariants violated");
+    }
+
+    // Internal helper methods
+
+    static final int inc(int i, int modulus) {
+        if (++i >= modulus)
+            i = 0;
+        return i;
+    }
+
+    static final int dec(int i, int modulus) {
+        if (--i < 0)
+            i = modulus - 1;
+        return i;
+    }
+
+    @SuppressWarnings("unchecked")
+    final E itemAt(int i) {
+        return (E)items[i];
+    }
+
+    @SuppressWarnings("unchecked")
+    static <E> E itemAt(Object[] items, int i) {
+        return (E)items[i];
+    }
+
+    /**
+     * do 删除元素
+     * @date 2022/7/16 14:12
+     * @param removeIndex
+     * @return void
+     */
+    void removeAt(final int removeIndex) {
+        // assert lock.isHeldByCurrentThread();
+        // assert lock.getHoldCount() == 1;
+        // assert items[removeIndex] != null;
+        // assert removeIndex >= 0 && removeIndex < items.length;
+        final Object[] items = this.items;
+        if (removeIndex == takeIndex) {
+            // removing front item; just advance
+            items[takeIndex] = null;
+            if (++takeIndex == items.length)
+                takeIndex = 0;
+            count--;
+            if (itrs != null)
+                itrs.elementDequeued();
+        } else {
+            // an "interior" remove
+
+            // slide over all others up through putIndex.
+            for (int i = removeIndex, putIndex = this.putIndex; ; ) {
+                int pred = i;
+                if (++i == items.length)
+                    i = 0;
+                if (i == putIndex) {
+                    items[pred] = null;
+                    this.putIndex = pred;
+                    break;
+                }
+                items[pred] = items[i];
+            }
+            count--;
+            if (itrs != null)
+                itrs.removedAt(removeIndex);
+        }
+        notFull.signal();
+    }
+
+    /**
+     *
+     */
     class Itrs {
 
         private class Node extends WeakReference<Itr> {
@@ -629,9 +835,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             itrs = null;
         }
 
-        /**
-         * Called whenever an element has been dequeued (at takeIndex).
-         */
         void elementDequeued() {
             // assert lock.isHeldByCurrentThread();
             if (count == 0)
@@ -641,56 +844,28 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
         }
     }
 
+    /**
+     *
+     */
     private class Itr implements Iterator<E> {
-        /**
-         * Index to look for new nextItem; NONE at end
-         */
         private int cursor;
 
-        /**
-         * Element to be returned by next call to next(); null if none
-         */
         private E nextItem;
 
-        /**
-         * Index of nextItem; NONE if none, REMOVED if removed elsewhere
-         */
         private int nextIndex;
 
-        /**
-         * Last element returned; null if none or not detached.
-         */
         private E lastItem;
 
-        /**
-         * Index of lastItem, NONE if none, REMOVED if removed elsewhere
-         */
         private int lastRet;
 
-        /**
-         * Previous value of takeIndex, or DETACHED when detached
-         */
         private int prevTakeIndex;
 
-        /**
-         * Previous value of iters.cycles
-         */
         private int prevCycles;
 
-        /**
-         * Special index value indicating "not available" or "undefined"
-         */
         private static final int NONE = -1;
 
-        /**
-         * Special index value indicating "removed elsewhere", that is,
-         * removed by some operation other than a call to this.remove().
-         */
         private static final int REMOVED = -2;
 
-        /**
-         * Special value for prevTakeIndex indicating "detached mode"
-         */
         private static final int DETACHED = -3;
 
         Itr() {
@@ -739,10 +914,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             return index;
         }
 
-        /**
-         * Returns true if index is invalidated by the given number of
-         * dequeues, starting from prevTakeIndex.
-         */
         private boolean invalidated(int index, int prevTakeIndex, long dequeues, int length) {
             if (index < 0)
                 return false;
@@ -752,10 +923,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             return dequeues > distance;
         }
 
-        /**
-         * Adjusts indices to incorporate all dequeues since the last
-         * operation on this iterator.  Call only from iterating thread.
-         */
         private void incorporateDequeues() {
             // assert lock.isHeldByCurrentThread();
             // assert itrs != null;
@@ -790,13 +957,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             }
         }
 
-        /**
-         * Called when itrs should stop tracking this iterator, either
-         * because there are no more indices to update (cursor < 0 &&
-         * nextIndex < 0 && lastRet < 0) or as a special exception, when
-         * lastRet >= 0, because hasNext() is about to return false for the
-         * first time.  Call only from iterating thread.
-         */
         private void detach() {
             // Switch to detached mode
             // assert lock.isHeldByCurrentThread();
@@ -812,12 +972,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             }
         }
 
-        /**
-         * For performance reasons, we would like not to acquire a lock in
-         * hasNext in the common case.  To allow for this, we only access
-         * fields (i.e. nextItem) that are not modified by update operations
-         * triggered by queue modifications.
-         */
         public boolean hasNext() {
             if (nextItem != null)
                 return true;
@@ -941,12 +1095,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             }
         }
 
-        /**
-         * Called to notify the iterator that the queue is empty, or that it
-         * has fallen hopelessly behind, so that it should abandon any
-         * further iteration, except possibly to return one more element
-         * from next(), as promised by returning true from hasNext().
-         */
         void shutdown() {
             // assert lock.isHeldByCurrentThread();
             cursor = NONE;
@@ -957,10 +1105,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
                 lastItem = null;
             }
             prevTakeIndex = DETACHED;
-            // Don't set nextItem to null because we must continue to be
-            // able to return it on next().
-            //
-            // Caller will unlink from itrs when convenient.
         }
 
         private int distance(int index, int prevTakeIndex, int length) {
@@ -970,11 +1114,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             return distance;
         }
 
-        /**
-         * Called whenever an interior remove (not at takeIndex) occurred.
-         *
-         * @return true if this iterator should be unlinked from itrs
-         */
         boolean removedAt(int removedIndex) {
             // assert lock.isHeldByCurrentThread();
             if (isDetached())
@@ -1023,11 +1162,6 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             return false;
         }
 
-        /**
-         * Called whenever takeIndex wraps around to zero.
-         *
-         * @return true if this iterator should be unlinked from itrs
-         */
         boolean takeIndexWrapped() {
             // assert lock.isHeldByCurrentThread();
             if (isDetached())
@@ -1041,173 +1175,5 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
             return false;
         }
 
-        //         /** Uncomment for debugging. */
-        //         public String toString() {
-        //             return ("cursor=" + cursor + " " +
-        //                     "nextIndex=" + nextIndex + " " +
-        //                     "lastRet=" + lastRet + " " +
-        //                     "nextItem=" + nextItem + " " +
-        //                     "lastItem=" + lastItem + " " +
-        //                     "prevCycles=" + prevCycles + " " +
-        //                     "prevTakeIndex=" + prevTakeIndex + " " +
-        //                     "size()=" + size() + " " +
-        //                     "remainingCapacity()=" + remainingCapacity());
-        //         }
-    }
-
-    public Spliterator<E> spliterator() {
-        return Spliterators.spliterator(this, (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT));
-    }
-
-    public void forEach(Consumer<? super E> action) {
-        Objects.requireNonNull(action);
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            if (count > 0) {
-                final Object[] items = this.items;
-                for (int i = takeIndex, end = putIndex, to = (i < end) ? end : items.length; ; i = 0, to = end) {
-                    for (; i < to; i++)
-                        action.accept(itemAt(items, i));
-                    if (to == end)
-                        break;
-                }
-            }
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public boolean removeIf(Predicate<? super E> filter) {
-        Objects.requireNonNull(filter);
-        return bulkRemove(filter);
-    }
-
-    public boolean removeAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> c.contains(e));
-    }
-
-    public boolean retainAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> !c.contains(e));
-    }
-
-    private boolean bulkRemove(Predicate<? super E> filter) {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            if (itrs == null) { // check for active iterators
-                if (count > 0) {
-                    final Object[] items = this.items;
-                    // Optimize for initial run of survivors
-                    for (int i = takeIndex, end = putIndex, to = (i < end) ? end : items.length; ; i = 0, to = end) {
-                        for (; i < to; i++)
-                            if (filter.test(itemAt(items, i)))
-                                return bulkRemoveModified(filter, i);
-                        if (to == end)
-                            break;
-                    }
-                }
-                return false;
-            }
-        } finally {
-            lock.unlock();
-        }
-        // Active iterators are too hairy!
-        // Punting (for now) to the slow n^2 algorithm ...
-        return super.removeIf(filter);
-    }
-
-    // A tiny bit set implementation
-
-    private static long[] nBits(int n) {
-        return new long[((n - 1) >> 6) + 1];
-    }
-
-    private static void setBit(long[] bits, int i) {
-        bits[i >> 6] |= 1L << i;
-    }
-
-    private static boolean isClear(long[] bits, int i) {
-        return (bits[i >> 6] & (1L << i)) == 0;
-    }
-
-    private int distanceNonEmpty(int i, int j) {
-        if ((j -= i) <= 0)
-            j += items.length;
-        return j;
-    }
-
-    private boolean bulkRemoveModified(Predicate<? super E> filter, final int beg) {
-        final Object[] es = items;
-        final int capacity = items.length;
-        final int end = putIndex;
-        final long[] deathRow = nBits(distanceNonEmpty(beg, putIndex));
-        deathRow[0] = 1L;   // set bit 0
-        for (int i = beg + 1, to = (i <= end) ? end : es.length, k = beg; ; i = 0, to = end, k -= capacity) {
-            for (; i < to; i++)
-                if (filter.test(itemAt(es, i)))
-                    setBit(deathRow, i - k);
-            if (to == end)
-                break;
-        }
-        // a two-finger traversal, with hare i reading, tortoise w writing
-        int w = beg;
-        for (int i = beg + 1, to = (i <= end) ? end : es.length, k = beg; ; w = 0) { // w rejoins i on second leg
-            // In this loop, i and w are on the same leg, with i > w
-            for (; i < to; i++)
-                if (isClear(deathRow, i - k))
-                    es[w++] = es[i];
-            if (to == end)
-                break;
-            // In this loop, w is on the first leg, i on the second
-            for (i = 0, to = end, k -= capacity; i < to && w < capacity; i++)
-                if (isClear(deathRow, i - k))
-                    es[w++] = es[i];
-            if (i >= to) {
-                if (w == capacity)
-                    w = 0; // "corner" case
-                break;
-            }
-        }
-        count -= distanceNonEmpty(w, end);
-        circularClear(es, putIndex = w, end);
-        return true;
-    }
-
-    void checkInvariants() {
-        // meta-assertions
-        // assert lock.isHeldByCurrentThread();
-        if (!invariantsSatisfied()) {
-            String detail = String.format("takeIndex=%d putIndex=%d count=%d capacity=%d items=%s", takeIndex, putIndex, count, items.length,
-                                          Arrays.toString(items));
-            System.err.println(detail);
-            throw new AssertionError(detail);
-        }
-    }
-
-    private boolean invariantsSatisfied() {
-        // Unlike ArrayDeque, we have a count field but no spare slot.
-        // We prefer ArrayDeque's strategy (and the names of its fields!),
-        // but our field layout is baked into the serial form, and so is
-        // too annoying to change.
-        //
-        // putIndex == takeIndex must be disambiguated by checking count.
-        int capacity = items.length;
-        return capacity > 0 && items.getClass() == Object[].class && (takeIndex | putIndex | count) >= 0 && takeIndex < capacity &&
-               putIndex < capacity && count <= capacity && (putIndex - takeIndex - count) % capacity == 0 &&
-               (count == 0 || items[takeIndex] != null) && (count == capacity || items[putIndex] == null) && (count == 0 || items[dec(putIndex,
-                                                                                                                                      capacity)] !=
-                                                                                                                            null);
-    }
-
-    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
-
-        // Read in items array and various fields
-        s.defaultReadObject();
-
-        if (!invariantsSatisfied())
-            throw new java.io.InvalidObjectException("invariants violated");
     }
 }

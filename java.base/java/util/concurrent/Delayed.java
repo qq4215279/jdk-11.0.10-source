@@ -10,6 +10,9 @@
 
 package java.util.concurrent;
 
+/**
+ * Delayed
+ */
 public interface Delayed extends Comparable<Delayed> {
 
     /**

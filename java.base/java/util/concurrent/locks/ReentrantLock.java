@@ -94,6 +94,12 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             return false;
         }
 
+        /**
+         * 尝试释放锁
+         * @date 2022/7/14 20:53
+         * @param releases
+         * @return boolean
+         */
         @ReservedStackAccess
         protected final boolean tryRelease(int releases) {
             int c = getState() - releases;
@@ -210,20 +216,20 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         sync = fair ? new FairSync() : new NonfairSync();
     }
 
-    public void lock() {
-        sync.acquire(1);
-    }
-
-    public void lockInterruptibly() throws InterruptedException {
-        sync.acquireInterruptibly(1);
-    }
-
     public boolean tryLock() {
         return sync.nonfairTryAcquire(1);
     }
 
     public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
         return sync.tryAcquireNanos(1, unit.toNanos(timeout));
+    }
+
+    public void lock() {
+        sync.acquire(1);
+    }
+
+    public void lockInterruptibly() throws InterruptedException {
+        sync.acquireInterruptibly(1);
     }
 
     public void unlock() {
@@ -233,6 +239,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     public Condition newCondition() {
         return sync.newCondition();
     }
+
 
     public int getHoldCount() {
         return sync.getHoldCount();

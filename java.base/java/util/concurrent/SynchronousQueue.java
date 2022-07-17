@@ -20,6 +20,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * SynchronousQueue是一种特殊的BlockingQueue，它本身没有容量。先调put(...)，线程会阻塞；直到另外一个线程调用了take()，两个线程才同时解锁，反之亦然。
  * 对于多个线程而言，例如3个线程，调用3次put(...)，3个线程都会阻塞；直到另外的线程调用3次take()，6个线程才同时解锁，反之亦然。
  *
+ * 接下来看一下什么是公平模式和非公平模式。假设3个线程分别调用了put(...)，3个线程会进入阻塞状态，直到其他线程调用3次take()，和3个put(...)一一配对。
+ * 如果是公平模式（队列模式），则第1个调用put(...)的线程1会在队列头部，第1个到来的take()线程和它进行配对，遵循先到先配对的原则，所以是公平的；
+ * 如果是非公平模式（栈模式），则第3个调用put(...)的线程3会在栈顶，第1个到来的take()线程和它进行配对，遵循的是后到先配对的原则，所以是非公平的。
  * @author liuzhen
  * @date 2022/4/15 23:37
  * @return
@@ -33,10 +36,33 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
 
     static final long SPIN_FOR_TIMEOUT_THRESHOLD = 1000L;
 
+    private ReentrantLock qlock;
+    private WaitQueue waitingProducers;
+    private WaitQueue waitingConsumers;
+
+    /**   */
+    private transient volatile Transferer<E> transferer;
+
+    public SynchronousQueue() {
+        this(false);
+    }
+
     /**
+     * @param fair
+     * @return
+     * @author liuzhen
+     * @date 2022/4/15 23:41
+     */
+    public SynchronousQueue(boolean fair) {
+        // 和锁一样，也有公平和非公平模式。如果是公平模式，则用TransferQueue实现；如果是非公平模式，则用TransferStack实现。
+        transferer = fair ? new TransferQueue<E>() : new TransferStack<E>();
+    }
+
+    /**
+     * TransferQueue是一个基于单向链表而实现的队列，通过head和tail 2个指针记录头部和尾部。
+     * 初始的时候，head和tail会指向一个空节点。
      * @author liuzhen
      * @date 2022/4/15 23:46
-     * @return
      */
     abstract static class Transferer<E> {
         /**
@@ -56,33 +82,33 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
      * 也是一个单向链表。不同于队列，只需要head指针就能实现入栈和出栈操作。
      * @author liuzhen
      * @date 2022/4/16 10:04
-     * @return
      */
     static final class TransferStack<E> extends Transferer<E> {
-
-        /* Modes for SNodes, ORed together in node fields */
         static final int REQUEST = 0;
         static final int DATA = 1;
         static final int FULFILLING = 2;
 
-        static boolean isFulfilling(int m) {
-            return (m & FULFILLING) != 0;
-        }
+        volatile SNode head;
 
         /**
          * 链表中的节点有三种状态，REQUEST对应take节点，DATA对应put节点，二者配对之后，会生成一个FULFILLING节点，入栈，然后FULLING节点和被配对的节点一起出栈。
+         * 过程：
+         * 1. head指向NULL。不同于TransferQueue，这里没有空的头节点。
+         * 2. 3个线程调用3次put，依次入栈。
+         * 3. 线程4调用take，和栈顶的第1个元素配对，生成FULLFILLING节点，入栈。
+         * 4. 栈顶的2个元素同时入栈。
          * @author liuzhen
          * @date 2022/4/16 10:28
          * @return
          */
         static final class SNode {
             /** 单向链表 */
-            volatile SNode next;        // next node in stack
+            volatile SNode next;
             /** 配对的节点 */
-            volatile SNode match;       // the node matched to this
+            volatile SNode match;
             /** 对应的阻塞线程 */
-            volatile Thread waiter;     // to control park/unpark
-            Object item;                // data; or null for REQUESTs
+            volatile Thread waiter;
+            Object item;
             /** 三种模式 */
             int mode;
 
@@ -129,20 +155,6 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
             }
         }
 
-        volatile SNode head;
-
-        boolean casHead(SNode h, SNode nh) {
-            return h == head && SHEAD.compareAndSet(this, h, nh);
-        }
-
-        static SNode snode(SNode s, Object e, SNode next, int mode) {
-            if (s == null)
-                s = new SNode(e);
-            s.mode = mode;
-            s.next = next;
-            return s;
-        }
-
         /**
          *
          * @param e
@@ -152,7 +164,6 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
          */
         @SuppressWarnings("unchecked")
         E transfer(E e, boolean timed, long nanos) {
-
             SNode s = null; // constructed/reused as needed
             int mode = (e == null) ? REQUEST : DATA;
 
@@ -210,6 +221,22 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
                     }
                 }
             }
+        }
+
+        static boolean isFulfilling(int m) {
+            return (m & FULFILLING) != 0;
+        }
+
+        boolean casHead(SNode h, SNode nh) {
+            return h == head && SHEAD.compareAndSet(this, h, nh);
+        }
+
+        static SNode snode(SNode s, Object e, SNode next, int mode) {
+            if (s == null)
+                s = new SNode(e);
+            s.mode = mode;
+            s.next = next;
+            return s;
         }
 
         SNode awaitFulfill(SNode s, boolean timed, long nanos) {
@@ -287,9 +314,11 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
      * TransferQueue是一个基于单向链表而实现的队列，通过head和tail 2个指针记录头部和尾部。初始的时候，head和tail会指向一个空节点，
      * @author liuzhen
      * @date 2022/4/16 10:02
-     * @return
      */
     static final class TransferQueue<E> extends Transferer<E> {
+        transient volatile QNode head;
+        transient volatile QNode tail;
+        transient volatile QNode cleanMe;
 
         static final class QNode {
             volatile QNode next;          // next node in queue
@@ -339,31 +368,25 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
 
         // -------------------->
 
-        transient volatile QNode head;
-        transient volatile QNode tail;
-        transient volatile QNode cleanMe;
-
+        /**
+         * TransferQueue是一个基于单向链表而实现的队列，通过head和tail 2个指针记录头部和尾部。初始的时候，head和tail会指向一个空节点
+         * 过程：
+         * 1. 队列中是一个空的节点，head/tail都指向这个空节点。
+         * 2. 3个线程分别调用put，生成3个QNode，进入队列。
+         * 3. 来了一个线程调用take，会和队列头部的第1个QNode进行配对。
+         * 4. 第1个QNode出队列。
+         * @date 2022/7/16 17:06
+         * @param
+         * @return
+         */
         TransferQueue() {
             QNode h = new QNode(null, false); // initialize to dummy node.
             head = h;
             tail = h;
         }
 
-        void advanceHead(QNode h, QNode nh) {
-            if (h == head && QHEAD.compareAndSet(this, h, nh))
-                h.next = h; // forget old next
-        }
-
-        void advanceTail(QNode t, QNode nt) {
-            if (tail == t)
-                QTAIL.compareAndSet(this, t, nt);
-        }
-
-        boolean casCleanMe(QNode cmp, QNode val) {
-            return cleanMe == cmp && QCLEANME.compareAndSet(this, cmp, val);
-        }
-
         /**
+         * 这里有一个关键点：put节点和take节点一旦相遇，就会配对出队列，所以在队列中不可能同时存在put节点和take节点，要么所有节点都是put节点，要么所有节点都是take节点。
          *
          * 整个 for 循环有两个大的 if-else 分支，如果当前线程和队列中的元素是同一种模式（都是put节点或者take节点），则与当前线程对应的节点被加入队列尾部并且阻塞；
          * 如果不是同一种模式，则选取队列头部的第1个元素进行配对。
@@ -376,7 +399,6 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
          */
         @SuppressWarnings("unchecked")
         E transfer(E e, boolean timed, long nanos) {
-
             QNode s = null; // constructed/reused as needed
             boolean isData = (e != null);
 
@@ -448,6 +470,20 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
                     return (x != null) ? (E)x : e;
                 }
             }
+        }
+
+        void advanceHead(QNode h, QNode nh) {
+            if (h == head && QHEAD.compareAndSet(this, h, nh))
+                h.next = h; // forget old next
+        }
+
+        void advanceTail(QNode t, QNode nt) {
+            if (tail == t)
+                QTAIL.compareAndSet(this, t, nt);
+        }
+
+        boolean casCleanMe(QNode cmp, QNode val) {
+            return cleanMe == cmp && QCLEANME.compareAndSet(this, cmp, val);
         }
 
         Object awaitFulfill(QNode s, E e, boolean timed, long nanos) {
@@ -540,22 +576,7 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
         }
     }
 
-    private transient volatile Transferer<E> transferer;
-
-    public SynchronousQueue() {
-        this(false);
-    }
-
-    /**
-     * @param fair
-     * @return
-     * @author liuzhen
-     * @date 2022/4/15 23:41
-     */
-    public SynchronousQueue(boolean fair) {
-        // 和锁一样，也有公平和非公平模式。如果是公平模式，则用TransferQueue实现；如果是非公平模式，则用TransferStack实现。
-        transferer = fair ? new TransferQueue<E>() : new TransferStack<E>();
-    }
+    // ---------------------------------------------------------------->
 
     /**
      * @param e
@@ -572,20 +593,35 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
         }
     }
 
+    /** 
+     *
+     * @date 2022/7/16 16:35 
+     * @param e 
+     * @return boolean
+     */
+    public boolean offer(E e) {
+        if (e == null)
+            throw new NullPointerException();
+        return transferer.transfer(e, true, 0) != null;
+    }
+
+    /** 
+     *
+     * @date 2022/7/16 16:35 
+     * @param e
+     * @param timeout
+     * @param unit 
+     * @return boolean
+     */
     public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
         if (e == null)
             throw new NullPointerException();
+
         if (transferer.transfer(e, true, unit.toNanos(timeout)) != null)
             return true;
         if (!Thread.interrupted())
             return false;
         throw new InterruptedException();
-    }
-
-    public boolean offer(E e) {
-        if (e == null)
-            throw new NullPointerException();
-        return transferer.transfer(e, true, 0) != null;
     }
 
     /**
@@ -602,6 +638,13 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
         throw new InterruptedException();
     }
 
+    /** 
+     *
+     * @date 2022/7/16 16:35 
+     * @param timeout
+     * @param unit 
+     * @return E
+     */
     public E poll(long timeout, TimeUnit unit) throws InterruptedException {
         E e = transferer.transfer(null, true, unit.toNanos(timeout));
         if (e != null || !Thread.interrupted())
@@ -609,9 +652,27 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
         throw new InterruptedException();
     }
 
+    /** 
+     *
+     * @date 2022/7/16 16:35 
+     * @param  
+     * @return E
+     */
     public E poll() {
         return transferer.transfer(null, true, 0);
     }
+
+    /** 
+     *
+     * @date 2022/7/16 16:35
+     * @param  
+     * @return E
+     */
+    public E peek() {
+        return null;
+    }
+
+    // ---------------------------------------------------------------->
 
     public boolean isEmpty() {
         return true;
@@ -646,10 +707,6 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
 
     public boolean retainAll(Collection<?> c) {
         return false;
-    }
-
-    public E peek() {
-        return null;
     }
 
     public Iterator<E> iterator() {
@@ -694,21 +751,6 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
         return n;
     }
 
-    static class WaitQueue implements java.io.Serializable {
-    }
-
-    static class LifoWaitQueue extends WaitQueue {
-        private static final long serialVersionUID = -3633113410248163686L;
-    }
-
-    static class FifoWaitQueue extends WaitQueue {
-        private static final long serialVersionUID = -3623113410248163686L;
-    }
-
-    private ReentrantLock qlock;
-    private WaitQueue waitingProducers;
-    private WaitQueue waitingConsumers;
-
     private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
         boolean fair = transferer instanceof TransferQueue;
         if (fair) {
@@ -733,5 +775,25 @@ public class SynchronousQueue<E> extends AbstractQueue<E> implements BlockingQue
 
     static {
         Class<?> ensureLoaded = LockSupport.class;
+    }
+
+    /**
+     *
+     */
+    static class WaitQueue implements java.io.Serializable {
+    }
+
+    /**
+     *
+     */
+    static class LifoWaitQueue extends WaitQueue {
+        private static final long serialVersionUID = -3633113410248163686L;
+    }
+
+    /**
+     *
+     */
+    static class FifoWaitQueue extends WaitQueue {
+        private static final long serialVersionUID = -3623113410248163686L;
     }
 }

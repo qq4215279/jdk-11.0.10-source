@@ -18,65 +18,74 @@ import java.util.NoSuchElementException;
  */
 public interface BlockingDeque<E> extends BlockingQueue<E>, Deque<E> {
 
-    void addFirst(E e);
+    // 添加元素 ---------------------------------------------------------------->
+    // first ----------------------------->
+    void push(E e);
 
-    void addLast(E e);
+    void addFirst(E e);
 
     boolean offerFirst(E e);
 
-    boolean offerLast(E e);
+    boolean offerFirst(E e, long timeout, TimeUnit unit) throws InterruptedException;
 
     void putFirst(E e) throws InterruptedException;
 
-    void putLast(E e) throws InterruptedException;
-
-    boolean offerFirst(E e, long timeout, TimeUnit unit) throws InterruptedException;
-
-    boolean offerLast(E e, long timeout, TimeUnit unit) throws InterruptedException;
-
-    E takeFirst() throws InterruptedException;
-
-    E takeLast() throws InterruptedException;
-
-    E pollFirst(long timeout, TimeUnit unit) throws InterruptedException;
-
-    E pollLast(long timeout, TimeUnit unit) throws InterruptedException;
-
-    boolean removeFirstOccurrence(Object o);
-
-    boolean removeLastOccurrence(Object o);
-
-    // *** BlockingQueue methods ***
-
+    // last ----------------------------->
     boolean add(E e);
+
+    void addLast(E e);
 
     boolean offer(E e);
 
-    void put(E e) throws InterruptedException;
-
     boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException;
 
+    boolean offerLast(E e);
+
+    boolean offerLast(E e, long timeout, TimeUnit unit) throws InterruptedException;
+
+    void put(E e) throws InterruptedException;
+
+    void putLast(E e) throws InterruptedException;
+
+
+    // 删除元素 ---------------------------------------------------------------->
+    // first ----------------------------->
     E remove();
-
-    E poll();
-
-    E take() throws InterruptedException;
-
-    E poll(long timeout, TimeUnit unit) throws InterruptedException;
-
-    E element();
-
-    E peek();
 
     boolean remove(Object o);
 
-    boolean contains(Object o);
+    E take() throws InterruptedException;
+
+    E takeFirst() throws InterruptedException;
+
+    E poll();
+
+    E poll(long timeout, TimeUnit unit) throws InterruptedException;
+
+    E pollFirst(long timeout, TimeUnit unit) throws InterruptedException;
+
+    boolean removeFirstOccurrence(Object o);
+    // last ----------------------------->
+
+    E takeLast() throws InterruptedException;
+
+    E pollLast(long timeout, TimeUnit unit) throws InterruptedException;
+
+    boolean removeLastOccurrence(Object o);
+
+    // 获取元素 ---------------------------------------------------------------->
+    E peek();
+
+    E element();
+
+    // ---------------------------------------------------------------->
 
     int size();
+
+    boolean contains(Object o);
 
     Iterator<E> iterator();
 
     // *** Stack methods ***
 
-    void push(E e);
 }

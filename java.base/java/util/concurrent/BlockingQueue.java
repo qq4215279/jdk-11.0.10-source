@@ -52,6 +52,7 @@ public interface BlockingQueue<E> extends Queue<E> {
 
     E take() throws InterruptedException;
 
+    // -------------------------------------------->
 
     int remainingCapacity();
 

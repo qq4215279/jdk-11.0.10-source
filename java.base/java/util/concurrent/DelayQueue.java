@@ -19,6 +19,9 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * DelayQueue即延迟队列，也就是一个按延迟时间从小到大出队的PriorityQueue。
  * 所谓延迟时间，就是“未来将要执行的时间”减去“当前时间”。为此，放入DelayQueue中的元素，必须实现Delayed接口。
+ * 关于该接口：
+ *  1. 如果getDelay的返回值小于或等于0，则说明该元素到期，需要从队列中拿出来执行。
+ *  2. 该接口首先继承了 Comparable 接口，所以要实现该接口，必须实现 Comparable 接口。具体来说，就是基于getDelay()的返回值比较两个元素的大小。
  * @author liuzhen
  * @date 2022/4/15 23:28
  * @return
@@ -32,6 +35,7 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
     /** 优先级队列 */
     private final PriorityQueue<E> q = new PriorityQueue<E>();
 
+    /** 记录等待堆顶元素的第1个线程 */
     private Thread leader;
 
 
@@ -42,20 +46,44 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
         this.addAll(c);
     }
 
+    // ---------------------------------------------------------------->
+
+    /**
+     *
+     * @date 2022/7/16 16:05
+     * @param e
+     * @return boolean
+     */
     public boolean add(E e) {
         return offer(e);
     }
 
+    /**
+     *
+     * @date 2022/7/16 16:05
+     * @param e
+     * @return void
+     */
     public void put(E e) {
         offer(e);
     }
 
+    /**
+     *
+     * @date 2022/7/16 16:05
+     * @param e
+     * @param timeout
+     * @param unit
+     * @return boolean
+     */
     public boolean offer(E e, long timeout, TimeUnit unit) {
         return offer(e);
     }
 
     /**
      *
+     * 注意：不是每放入一个元素，都需要通知等待的线程。放入的元素，如果其延迟时间大于当前堆顶
+     * 的元素延迟时间，就没必要通知等待的线程；只有当延迟时间是最小的，在堆顶时，才有必要通知等待的线程，
      * @author liuzhen
      * @date 2022/4/15 23:35
      * @param e
@@ -78,12 +106,17 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
         }
     }
 
-    public E poll() {
+    /**
+     *
+     * @date 2022/7/16 16:05
+     * @param o
+     * @return boolean
+     */
+    public boolean remove(Object o) {
         final ReentrantLock lock = this.lock;
         lock.lock();
         try {
-            E first = q.peek();
-            return (first == null || first.getDelay(NANOSECONDS) > 0) ? null : q.poll();
+            return q.remove(o);
         } finally {
             lock.unlock();
         }
@@ -140,6 +173,17 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
         }
     }
 
+    public E poll() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            E first = q.peek();
+            return (first == null || first.getDelay(NANOSECONDS) > 0) ? null : q.poll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public E poll(long timeout, TimeUnit unit) throws InterruptedException {
         long nanos = unit.toNanos(timeout);
         final ReentrantLock lock = this.lock;
@@ -190,6 +234,8 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
             lock.unlock();
         }
     }
+
+    // ---------------------------------------------------------------->
 
     public int size() {
         final ReentrantLock lock = this.lock;
@@ -260,16 +306,6 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
         }
     }
 
-    public boolean remove(Object o) {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return q.remove(o);
-        } finally {
-            lock.unlock();
-        }
-    }
-
     void removeEQ(Object o) {
         final ReentrantLock lock = this.lock;
         lock.lock();
@@ -289,6 +325,9 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E> implements B
         return new Itr(toArray());
     }
 
+    /**
+     *
+     */
     private class Itr implements Iterator<E> {
         final Object[] array; // Array of all elements
         int cursor;           // index of next element to return

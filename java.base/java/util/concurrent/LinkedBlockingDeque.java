@@ -18,7 +18,8 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- *
+ * LinkedBlockingDeque
+ * 对应的实现原理，和LinkedBlockingQueue基本一样，只是LinkedBlockingQueue是单向链表，而LinkedBlockingDeque是双向链表。
  * @author liuzhen
  * @date 2022/4/15 23:51
  * @return
@@ -26,18 +27,6 @@ import java.util.function.Predicate;
 public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements BlockingDeque<E>, java.io.Serializable {
 
     private static final long serialVersionUID = -387911632671998426L;
-
-    static final class Node<E> {
-        E item;
-        /** 双向链表的Node */
-        Node<E> prev;
-
-        Node<E> next;
-
-        Node(E x) {
-            item = x;
-        }
-    }
 
     /** 队列的头和尾 */
     transient Node<E> first;
@@ -56,6 +45,22 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
     private final Condition notEmpty = lock.newCondition();
     private final Condition notFull = lock.newCondition();
 
+    /**
+     *
+     * @date 2022/7/16 17:23
+     */
+    static final class Node<E> {
+        E item;
+        /** 双向链表的Node */
+        Node<E> prev;
+
+        Node<E> next;
+
+        Node(E x) {
+            item = x;
+        }
+    }
+
     public LinkedBlockingDeque() {
         this(Integer.MAX_VALUE);
     }
@@ -71,8 +76,318 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         addAll(c);
     }
 
-    // Basic linking and unlinking operations, called only while holding lock
 
+    /** 1. BlockingDeque start =========================================================> */
+    // 添加元素 ---------------------------------------------------------------->
+    // first ----------------------------->
+    public void push(E e) {
+        addFirst(e);
+    }
+
+    public void addFirst(E e) {
+        if (!offerFirst(e))
+            throw new IllegalStateException("Deque full");
+    }
+
+    public boolean offerFirst(E e) {
+        if (e == null)
+            throw new NullPointerException();
+        Node<E> node = new Node<E>(e);
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return linkFirst(node);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean offerFirst(E e, long timeout, TimeUnit unit) throws InterruptedException {
+        if (e == null)
+            throw new NullPointerException();
+        Node<E> node = new Node<E>(e);
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (!linkFirst(node)) {
+                if (nanos <= 0L)
+                    return false;
+                nanos = notFull.awaitNanos(nanos);
+            }
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** 
+     *
+     * @date 2022/7/16 17:43
+     * @param e 
+     * @return void
+     */
+    public void putFirst(E e) throws InterruptedException {
+        if (e == null)
+            throw new NullPointerException();
+        Node<E> node = new Node<E>(e);
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            while (!linkFirst(node))
+                notFull.await();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // last ----------------------------->
+    public boolean add(E e) {
+        addLast(e);
+        return true;
+    }
+
+    public void addLast(E e) {
+        if (!offerLast(e))
+            throw new IllegalStateException("Deque full");
+    }
+
+    public boolean offer(E e) {
+        return offerLast(e);
+    }
+
+    public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
+        return offerLast(e, timeout, unit);
+    }
+
+    public boolean offerLast(E e) {
+        if (e == null)
+            throw new NullPointerException();
+        Node<E> node = new Node<E>(e);
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return linkLast(node);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean offerLast(E e, long timeout, TimeUnit unit) throws InterruptedException {
+        if (e == null)
+            throw new NullPointerException();
+        Node<E> node = new Node<E>(e);
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (!linkLast(node)) {
+                if (nanos <= 0L)
+                    return false;
+                nanos = notFull.awaitNanos(nanos);
+            }
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void put(E e) throws InterruptedException {
+        putLast(e);
+    }
+
+    /**
+     *
+     * @date 2022/7/16 17:43
+     * @param e
+     * @return void
+     */
+    public void putLast(E e) throws InterruptedException {
+        if (e == null)
+            throw new NullPointerException();
+        Node<E> node = new Node<E>(e);
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            while (!linkLast(node))
+                notFull.await();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // 删除元素 ---------------------------------------------------------------->
+    // first ----------------------------->
+    public E remove() {
+        return removeFirst();
+    }
+
+    public boolean remove(Object o) {
+        return removeFirstOccurrence(o);
+    }
+
+    public boolean removeFirstOccurrence(Object o) {
+        if (o == null)
+            return false;
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            for (Node<E> p = first; p != null; p = p.next) {
+                if (o.equals(p.item)) {
+                    unlink(p);
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public E take() throws InterruptedException {
+        return takeFirst();
+    }
+
+    /**
+     * 对应的实现原理，和LinkedBlockingQueue基本一样，只是LinkedBlockingQueue是单向链表，而LinkedBlockingDeque是双向链表。
+     * @author liuzhen
+     * @date 2022/4/15 23:53
+     * @param
+     * @return E
+     */
+    public E takeFirst() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            E x;
+            while ((x = unlinkFirst()) == null)
+                notEmpty.await();
+            return x;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public E poll() {
+        return pollFirst();
+    }
+
+    public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+        return pollFirst(timeout, unit);
+    }
+
+    public E pollFirst(long timeout, TimeUnit unit) throws InterruptedException {
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            E x;
+            while ((x = unlinkFirst()) == null) {
+                if (nanos <= 0L)
+                    return null;
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+            return x;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // last ----------------------------->
+    /** 
+     *
+     * @date 2022/7/16 17:42 
+     * @param  
+     * @return E
+     */
+    public E takeLast() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            E x;
+            while ((x = unlinkLast()) == null)
+                notEmpty.await();
+            return x;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public E pollLast(long timeout, TimeUnit unit) throws InterruptedException {
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            E x;
+            while ((x = unlinkLast()) == null) {
+                if (nanos <= 0L)
+                    return null;
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+            return x;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean removeLastOccurrence(Object o) {
+        if (o == null)
+            return false;
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            for (Node<E> p = last; p != null; p = p.prev) {
+                if (o.equals(p.item)) {
+                    unlink(p);
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // 获取元素 ---------------------------------------------------------------->
+    public E peek() {
+        return peekFirst();
+    }
+
+    public E element() {
+        return getFirst();
+    }
+
+    // 其他---------------------------------------------------------------->
+    public int size() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            return count;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean contains(Object o) {
+        if (o == null)
+            return false;
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            for (Node<E> p = first; p != null; p = p.next)
+                if (o.equals(p.item))
+                    return true;
+            return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public Iterator<E> iterator() {
+        return new Itr();
+    }
+
+    // private ---------------------------------------------------------------->
     private boolean linkFirst(Node<E> node) {
         // assert lock.isHeldByCurrentThread();
         if (count >= capacity)
@@ -103,6 +418,26 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         ++count;
         notEmpty.signal();
         return true;
+    }
+
+    void unlink(Node<E> x) {
+        // assert lock.isHeldByCurrentThread();
+        // assert x.item != null;
+        Node<E> p = x.prev;
+        Node<E> n = x.next;
+        if (p == null) {
+            unlinkFirst();
+        } else if (n == null) {
+            unlinkLast();
+        } else {
+            p.next = n;
+            n.prev = p;
+            x.item = null;
+            // Don't mess with x's links.  They may still be in use by
+            // an iterator.
+            --count;
+            notFull.signal();
+        }
     }
 
     private E unlinkFirst() {
@@ -143,131 +478,12 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         return item;
     }
 
-    /**
-     * Unlinks x.
-     */
-    void unlink(Node<E> x) {
-        // assert lock.isHeldByCurrentThread();
-        // assert x.item != null;
-        Node<E> p = x.prev;
-        Node<E> n = x.next;
-        if (p == null) {
-            unlinkFirst();
-        } else if (n == null) {
-            unlinkLast();
-        } else {
-            p.next = n;
-            n.prev = p;
-            x.item = null;
-            // Don't mess with x's links.  They may still be in use by
-            // an iterator.
-            --count;
-            notFull.signal();
-        }
-    }
+    /** 1. BlockingDeque end =========================================================> */
 
-    // BlockingDeque methods
+    /** 2. Deque start =========================================================> */
 
-    public void addFirst(E e) {
-        if (!offerFirst(e))
-            throw new IllegalStateException("Deque full");
-    }
-
-    public void addLast(E e) {
-        if (!offerLast(e))
-            throw new IllegalStateException("Deque full");
-    }
-
-    public boolean offerFirst(E e) {
-        if (e == null)
-            throw new NullPointerException();
-        Node<E> node = new Node<E>(e);
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return linkFirst(node);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public boolean offerLast(E e) {
-        if (e == null)
-            throw new NullPointerException();
-        Node<E> node = new Node<E>(e);
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return linkLast(node);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public void putFirst(E e) throws InterruptedException {
-        if (e == null)
-            throw new NullPointerException();
-        Node<E> node = new Node<E>(e);
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            while (!linkFirst(node))
-                notFull.await();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public void putLast(E e) throws InterruptedException {
-        if (e == null)
-            throw new NullPointerException();
-        Node<E> node = new Node<E>(e);
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            while (!linkLast(node))
-                notFull.await();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public boolean offerFirst(E e, long timeout, TimeUnit unit) throws InterruptedException {
-        if (e == null)
-            throw new NullPointerException();
-        Node<E> node = new Node<E>(e);
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            while (!linkFirst(node)) {
-                if (nanos <= 0L)
-                    return false;
-                nanos = notFull.awaitNanos(nanos);
-            }
-            return true;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public boolean offerLast(E e, long timeout, TimeUnit unit) throws InterruptedException {
-        if (e == null)
-            throw new NullPointerException();
-        Node<E> node = new Node<E>(e);
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            while (!linkLast(node)) {
-                if (nanos <= 0L)
-                    return false;
-                nanos = notFull.awaitNanos(nanos);
-            }
-            return true;
-        } finally {
-            lock.unlock();
-        }
+    public E pop() {
+        return removeFirst();
     }
 
     public E removeFirst() {
@@ -299,73 +515,6 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         lock.lock();
         try {
             return unlinkLast();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /**
-     * 对应的实现原理，和LinkedBlockingQueue基本一样，只是LinkedBlockingQueue是单向链表，而LinkedBlockingDeque是双向链表。
-     * @author liuzhen
-     * @date 2022/4/15 23:53
-     * @param
-     * @return E
-     */
-    public E takeFirst() throws InterruptedException {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            E x;
-            while ((x = unlinkFirst()) == null)
-                notEmpty.await();
-            return x;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public E takeLast() throws InterruptedException {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            E x;
-            while ((x = unlinkLast()) == null)
-                notEmpty.await();
-            return x;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public E pollFirst(long timeout, TimeUnit unit) throws InterruptedException {
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            E x;
-            while ((x = unlinkFirst()) == null) {
-                if (nanos <= 0L)
-                    return null;
-                nanos = notEmpty.awaitNanos(nanos);
-            }
-            return x;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public E pollLast(long timeout, TimeUnit unit) throws InterruptedException {
-        long nanos = unit.toNanos(timeout);
-        final ReentrantLock lock = this.lock;
-        lock.lockInterruptibly();
-        try {
-            E x;
-            while ((x = unlinkLast()) == null) {
-                if (nanos <= 0L)
-                    return null;
-                nanos = notEmpty.awaitNanos(nanos);
-            }
-            return x;
         } finally {
             lock.unlock();
         }
@@ -405,84 +554,13 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         }
     }
 
-    public boolean removeFirstOccurrence(Object o) {
-        if (o == null)
-            return false;
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            for (Node<E> p = first; p != null; p = p.next) {
-                if (o.equals(p.item)) {
-                    unlink(p);
-                    return true;
-                }
-            }
-            return false;
-        } finally {
-            lock.unlock();
-        }
+    public Iterator<E> descendingIterator() {
+        return new DescendingItr();
     }
 
-    public boolean removeLastOccurrence(Object o) {
-        if (o == null)
-            return false;
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            for (Node<E> p = last; p != null; p = p.prev) {
-                if (o.equals(p.item)) {
-                    unlink(p);
-                    return true;
-                }
-            }
-            return false;
-        } finally {
-            lock.unlock();
-        }
-    }
+    /** 2. Deque end =========================================================> */
 
-    // BlockingQueue methods
-
-    public boolean add(E e) {
-        addLast(e);
-        return true;
-    }
-
-    public boolean offer(E e) {
-        return offerLast(e);
-    }
-
-    public void put(E e) throws InterruptedException {
-        putLast(e);
-    }
-
-    public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
-        return offerLast(e, timeout, unit);
-    }
-
-    public E remove() {
-        return removeFirst();
-    }
-
-    public E poll() {
-        return pollFirst();
-    }
-
-    public E take() throws InterruptedException {
-        return takeFirst();
-    }
-
-    public E poll(long timeout, TimeUnit unit) throws InterruptedException {
-        return pollFirst(timeout, unit);
-    }
-
-    public E element() {
-        return getFirst();
-    }
-
-    public E peek() {
-        return peekFirst();
-    }
+    /** 3. BlockingQueue start =========================================================> */
 
     public int remainingCapacity() {
         final ReentrantLock lock = this.lock;
@@ -518,46 +596,9 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         }
     }
 
-    // Stack methods
-
-    public void push(E e) {
-        addFirst(e);
-    }
-
-    public E pop() {
-        return removeFirst();
-    }
+    /** 3. BlockingQueue end =========================================================> */
 
     // Collection methods
-
-    public boolean remove(Object o) {
-        return removeFirstOccurrence(o);
-    }
-
-    public int size() {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            return count;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public boolean contains(Object o) {
-        if (o == null)
-            return false;
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            for (Node<E> p = first; p != null; p = p.next)
-                if (o.equals(p.item))
-                    return true;
-            return false;
-        } finally {
-            lock.unlock();
-        }
-    }
 
     public boolean addAll(Collection<? extends E> c) {
         if (c == this)
@@ -603,6 +644,11 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         // Fall back to historic non-atomic implementation, failing
         // with IllegalStateException when the capacity is exceeded.
         return super.addAll(c);
+    }
+
+    public boolean removeAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> c.contains(e));
     }
 
     @SuppressWarnings("unchecked")
@@ -662,38 +708,163 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         }
     }
 
+    public Spliterator<E> spliterator() {
+        return new LBDSpliterator();
+    }
+
+    public void forEach(Consumer<? super E> action) {
+        Objects.requireNonNull(action);
+        forEachFrom(action, null);
+    }
+
+    public boolean removeIf(Predicate<? super E> filter) {
+        Objects.requireNonNull(filter);
+        return bulkRemove(filter);
+    }
+
+    public boolean retainAll(Collection<?> c) {
+        Objects.requireNonNull(c);
+        return bulkRemove(e -> !c.contains(e));
+    }
+
     Node<E> succ(Node<E> p) {
         if (p == (p = p.next))
             p = first;
         return p;
     }
 
-    public Iterator<E> iterator() {
-        return new Itr();
+    void forEachFrom(Consumer<? super E> action, Node<E> p) {
+        // Extract batches of elements while holding the lock; then
+        // run the action on the elements while not
+        final ReentrantLock lock = this.lock;
+        final int batchSize = 64;       // max number of elements per batch
+        Object[] es = null;             // container for batch of elements
+        int n, len = 0;
+        do {
+            lock.lock();
+            try {
+                if (es == null) {
+                    if (p == null)
+                        p = first;
+                    for (Node<E> q = p; q != null; q = succ(q))
+                        if (q.item != null && ++len == batchSize)
+                            break;
+                    es = new Object[len];
+                }
+                for (n = 0; p != null && n < len; p = succ(p))
+                    if ((es[n] = p.item) != null)
+                        n++;
+            } finally {
+                lock.unlock();
+            }
+            for (int i = 0; i < n; i++) {
+                @SuppressWarnings("unchecked") E e = (E)es[i];
+                action.accept(e);
+            }
+        } while (n > 0 && p != null);
     }
 
-    public Iterator<E> descendingIterator() {
-        return new DescendingItr();
+    @SuppressWarnings("unchecked")
+    private boolean bulkRemove(Predicate<? super E> filter) {
+        boolean removed = false;
+        final ReentrantLock lock = this.lock;
+        Node<E> p = null;
+        Node<E>[] nodes = null;
+        int n, len = 0;
+        do {
+            // 1. Extract batch of up to 64 elements while holding the lock.
+            lock.lock();
+            try {
+                if (nodes == null) {  // first batch; initialize
+                    p = first;
+                    for (Node<E> q = p; q != null; q = succ(q))
+                        if (q.item != null && ++len == 64)
+                            break;
+                    nodes = (Node<E>[])new Node<?>[len];
+                }
+                for (n = 0; p != null && n < len; p = succ(p))
+                    nodes[n++] = p;
+            } finally {
+                lock.unlock();
+            }
+
+            // 2. Run the filter on the elements while lock is free.
+            long deathRow = 0L;       // "bitset" of size 64
+            for (int i = 0; i < n; i++) {
+                final E e;
+                if ((e = nodes[i].item) != null && filter.test(e))
+                    deathRow |= 1L << i;
+            }
+
+            // 3. Remove any filtered elements while holding the lock.
+            if (deathRow != 0) {
+                lock.lock();
+                try {
+                    for (int i = 0; i < n; i++) {
+                        final Node<E> q;
+                        if ((deathRow & (1L << i)) != 0L && (q = nodes[i]).item != null) {
+                            unlink(q);
+                            removed = true;
+                        }
+                        nodes[i] = null; // help GC
+                    }
+                } finally {
+                    lock.unlock();
+                }
+            }
+        } while (n > 0 && p != null);
+        return removed;
     }
 
+    private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            // Write out capacity and any hidden stuff
+            s.defaultWriteObject();
+            // Write out all elements in the proper order.
+            for (Node<E> p = first; p != null; p = p.next)
+                s.writeObject(p.item);
+            // Use trailing null as sentinel
+            s.writeObject(null);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+        s.defaultReadObject();
+        count = 0;
+        first = null;
+        last = null;
+        // Read in all elements and place in queue
+        for (; ; ) {
+            @SuppressWarnings("unchecked") E item = (E)s.readObject();
+            if (item == null)
+                break;
+            add(item);
+        }
+    }
+
+    void checkInvariants() {
+        // assert lock.isHeldByCurrentThread();
+        // Nodes may get self-linked or lose their item, but only
+        // after being unlinked and becoming unreachable from first.
+        for (Node<E> p = first; p != null; p = p.next) {
+            // assert p.next != p;
+            // assert p.item != null;
+        }
+    }
+
+
+    /**
+     *
+     */
     private abstract class AbstractItr implements Iterator<E> {
-        /**
-         * The next node to return in next().
-         */
         Node<E> next;
 
-        /**
-         * nextItem holds on to item fields because once we claim that
-         * an element exists in hasNext(), we must return item read
-         * under lock even if it was in the process of being removed
-         * when hasNext() was called.
-         */
         E nextItem;
 
-        /**
-         * Node returned by most recent call to next. Needed by remove.
-         * Reset to null if this element is deleted by a call to remove.
-         */
         private Node<E> lastRet;
 
         abstract Node<E> firstNode();
@@ -799,6 +970,9 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         }
     }
 
+    /**
+     *
+     */
     private class Itr extends AbstractItr {
         Itr() {
         }                        // prevent access constructor creation
@@ -812,6 +986,9 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         }
     }
 
+    /**
+     *
+     */
     private class DescendingItr extends AbstractItr {
         DescendingItr() {
         }              // prevent access constructor creation
@@ -825,6 +1002,9 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
         }
     }
 
+    /**
+     *
+     */
     private final class LBDSpliterator implements Spliterator<E> {
         static final int MAX_BATCH = 1 << 25;  // max batch array size;
         Node<E> current;    // current node; null until initialized
@@ -905,153 +1085,6 @@ public class LinkedBlockingDeque<E> extends AbstractQueue<E> implements Blocking
 
         public int characteristics() {
             return (Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT);
-        }
-    }
-
-    public Spliterator<E> spliterator() {
-        return new LBDSpliterator();
-    }
-
-    public void forEach(Consumer<? super E> action) {
-        Objects.requireNonNull(action);
-        forEachFrom(action, null);
-    }
-
-    void forEachFrom(Consumer<? super E> action, Node<E> p) {
-        // Extract batches of elements while holding the lock; then
-        // run the action on the elements while not
-        final ReentrantLock lock = this.lock;
-        final int batchSize = 64;       // max number of elements per batch
-        Object[] es = null;             // container for batch of elements
-        int n, len = 0;
-        do {
-            lock.lock();
-            try {
-                if (es == null) {
-                    if (p == null)
-                        p = first;
-                    for (Node<E> q = p; q != null; q = succ(q))
-                        if (q.item != null && ++len == batchSize)
-                            break;
-                    es = new Object[len];
-                }
-                for (n = 0; p != null && n < len; p = succ(p))
-                    if ((es[n] = p.item) != null)
-                        n++;
-            } finally {
-                lock.unlock();
-            }
-            for (int i = 0; i < n; i++) {
-                @SuppressWarnings("unchecked") E e = (E)es[i];
-                action.accept(e);
-            }
-        } while (n > 0 && p != null);
-    }
-
-    public boolean removeIf(Predicate<? super E> filter) {
-        Objects.requireNonNull(filter);
-        return bulkRemove(filter);
-    }
-
-    public boolean removeAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> c.contains(e));
-    }
-
-    public boolean retainAll(Collection<?> c) {
-        Objects.requireNonNull(c);
-        return bulkRemove(e -> !c.contains(e));
-    }
-
-    @SuppressWarnings("unchecked")
-    private boolean bulkRemove(Predicate<? super E> filter) {
-        boolean removed = false;
-        final ReentrantLock lock = this.lock;
-        Node<E> p = null;
-        Node<E>[] nodes = null;
-        int n, len = 0;
-        do {
-            // 1. Extract batch of up to 64 elements while holding the lock.
-            lock.lock();
-            try {
-                if (nodes == null) {  // first batch; initialize
-                    p = first;
-                    for (Node<E> q = p; q != null; q = succ(q))
-                        if (q.item != null && ++len == 64)
-                            break;
-                    nodes = (Node<E>[])new Node<?>[len];
-                }
-                for (n = 0; p != null && n < len; p = succ(p))
-                    nodes[n++] = p;
-            } finally {
-                lock.unlock();
-            }
-
-            // 2. Run the filter on the elements while lock is free.
-            long deathRow = 0L;       // "bitset" of size 64
-            for (int i = 0; i < n; i++) {
-                final E e;
-                if ((e = nodes[i].item) != null && filter.test(e))
-                    deathRow |= 1L << i;
-            }
-
-            // 3. Remove any filtered elements while holding the lock.
-            if (deathRow != 0) {
-                lock.lock();
-                try {
-                    for (int i = 0; i < n; i++) {
-                        final Node<E> q;
-                        if ((deathRow & (1L << i)) != 0L && (q = nodes[i]).item != null) {
-                            unlink(q);
-                            removed = true;
-                        }
-                        nodes[i] = null; // help GC
-                    }
-                } finally {
-                    lock.unlock();
-                }
-            }
-        } while (n > 0 && p != null);
-        return removed;
-    }
-
-    private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
-        final ReentrantLock lock = this.lock;
-        lock.lock();
-        try {
-            // Write out capacity and any hidden stuff
-            s.defaultWriteObject();
-            // Write out all elements in the proper order.
-            for (Node<E> p = first; p != null; p = p.next)
-                s.writeObject(p.item);
-            // Use trailing null as sentinel
-            s.writeObject(null);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
-        s.defaultReadObject();
-        count = 0;
-        first = null;
-        last = null;
-        // Read in all elements and place in queue
-        for (; ; ) {
-            @SuppressWarnings("unchecked") E item = (E)s.readObject();
-            if (item == null)
-                break;
-            add(item);
-        }
-    }
-
-    void checkInvariants() {
-        // assert lock.isHeldByCurrentThread();
-        // Nodes may get self-linked or lose their item, but only
-        // after being unlinked and becoming unreachable from first.
-        for (Node<E> p = first; p != null; p = p.next) {
-            // assert p.next != p;
-            // assert p.item != null;
         }
     }
 
