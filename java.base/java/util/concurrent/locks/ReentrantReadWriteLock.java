@@ -36,17 +36,26 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
      * @date 2022/6/19 19:11
      */
     abstract static class Sync extends AbstractQueuedSynchronizer {
+        /** 版本序列号 */
         private static final long serialVersionUID = 6317671515068378041L;
 
+        /** 高16位为读锁，低16位为写锁 */
         static final int SHARED_SHIFT = 16;
+        /** 读锁单位 */
         static final int SHARED_UNIT = (1 << SHARED_SHIFT);
+        /** 读锁最大数量 */
         static final int MAX_COUNT = (1 << SHARED_SHIFT) - 1;
+        /** 写锁最大数量 */
         static final int EXCLUSIVE_MASK = (1 << SHARED_SHIFT) - 1;
 
+        /** 本地线程计数器 */
         private transient ThreadLocalHoldCounter readHolds;
+        /** 缓存的计数器 */
         private transient HoldCounter cachedHoldCounter;
 
+        /** 第一个读线程 */
         private transient Thread firstReader;
+        /** 第一个读线程的计数 */
         private transient int firstReaderHoldCount;
 
         static final class HoldCounter {

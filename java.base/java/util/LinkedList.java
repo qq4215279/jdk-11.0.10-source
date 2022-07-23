@@ -70,161 +70,7 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
         addAll(c);
     }
 
-    /**
-     * 删除元素
-     * @author liuzhen
-     * @date 2022/4/9 21:39
-     * @param
-     * @return E
-     */
-    public E remove() {
-        return removeFirst();
-    }
-
-    public E remove(int index) {
-        checkElementIndex(index);
-
-        return unlink(node(index));
-    }
-
-    /**
-     *
-     * 如果存在，则从该列表中删除指定元素的第⼀次出现
-     * 此⽅法本质上和 remove(int index) 没多⼤区别，通过循环判断元素进⾏删除，需要注意的是，是删除第⼀次出现的元素，不是所有的
-     * @author liuzhen
-     * @date 2022/4/9 22:01
-     * @param o
-     * @return boolean
-     */
-    public boolean remove(Object o) {
-        if (o == null) {
-            for (Node<E> x = first; x != null; x = x.next) {
-                if (x.item == null) {
-                    unlink(x);
-                    return true;
-                }
-            }
-        } else {
-            for (Node<E> x = first; x != null; x = x.next) {
-                if (o.equals(x.item)) {
-                    unlink(x);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     *
-     */
-    E unlink(Node<E> x) {
-        // assert x != null;
-        final E element = x.item;
-        final Node<E> next = x.next;
-        final Node<E> prev = x.prev;
-
-        if (prev == null) {
-            first = next;
-        } else {
-            prev.next = next;
-            x.prev = null;
-        }
-
-        if (next == null) {
-            last = prev;
-        } else {
-            next.prev = prev;
-            x.next = null;
-        }
-
-        x.item = null;
-        size--;
-        modCount++;
-        return element;
-    }
-
-    /**
-     * 从此列表中移除并返回第⼀个元素
-     */
-    public E removeFirst() {
-        // f设为头结点
-        final Node<E> f = first;
-        // 如果头结点为空，则抛出异常
-        if (f == null)
-            throw new NoSuchElementException();
-        return unlinkFirst(f);
-    }
-
-    private E unlinkFirst(Node<E> f) {
-        // assert f == first && f != null;
-        final E element = f.item;
-        // next 为头结点的下⼀个节点
-        final Node<E> next = f.next;
-        f.item = null;
-        // 将节点的元素以及引⽤都设为 null，便于垃圾回收
-        f.next = null; // help GC
-        // 修改头结点为第⼆个节点
-        first = next;
-
-        // 如果第⼆个节点为空（当前链表只存在第⼀个元素）
-        if (next == null) {
-            // 那么尾节点也置为 null
-            last = null;
-        } else {
-            // 如果第⼆个节点不为空，那么将第⼆个节点的上⼀个引⽤置为 null
-            next.prev = null;
-        }
-
-        size--;
-        modCount++;
-        return element;
-    }
-
-    /**
-     * 从该列表中删除并返回最后⼀个元素
-     * @author liuzhen
-     * @date 2022/4/9 21:44
-     * @param
-     * @return E
-     */
-    public E removeLast() {
-        final Node<E> l = last;
-        // 如果尾节点为空，表示当前集合为空，抛出异常
-        if (l == null)
-            throw new NoSuchElementException();
-
-        return unlinkLast(l);
-    }
-
-    /**
-     *
-     */
-    private E unlinkLast(Node<E> l) {
-        // assert l == last && l != null;
-        final E element = l.item;
-        final Node<E> prev = l.prev;
-        l.item = null;
-        // 将节点的元素以及引⽤都设为 null，便于垃圾回收
-        l.prev = null; // help GC
-        // 尾节点为倒数第⼆个节点
-        last = prev;
-
-        // 如果倒数第⼆个节点为null
-        if (prev == null) {
-            // 那么将节点也置为 null
-            first = null;
-        } else {
-            // 如果倒数第⼆个节点不为空，那么将倒数第⼆个节点的下⼀个引⽤置为 null
-            prev.next = null;
-        }
-
-        size--;
-        modCount++;
-
-        return element;
-    }
-
+    // 添加元素 ---------------------------------------------------------------->
     /** 
      * 添加元素到默认
      * @author liuzhen
@@ -235,6 +81,17 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
     public boolean add(E e) {
         linkLast(e);
         return true;
+    }
+
+    /**
+     * 将指定元素添加到链表尾
+     * @author liuzhen
+     * @date 2022/4/9 21:16
+     * @param e
+     * @return void
+     */
+    public void addLast(E e) {
+        linkLast(e);
     }
 
     /**
@@ -268,114 +125,6 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
      */
     public void addFirst(E e) {
         linkFirst(e);
-    }
-
-    /**
-     * 将指定的元素附加到链表头节点
-     */
-    private void linkFirst(E e) {
-        // 将头节点赋值给 f
-        final Node<E> f = first;
-        // 将指定元素构造成⼀个新节点，此节点的指向下⼀个节点的引⽤为头节点
-        final Node<E> newNode = new Node<>(null, e, f);
-        // 将新节点设为头节点，那么原先的头节点 f 变为第⼆个节点
-        first = newNode;
-        // 如果第⼆个节点为空，也就是原先链表是空
-        if (f == null) {
-            // 将这个新节点也设为尾节点（前⾯已经设为头节点了）
-            last = newNode;
-        } else {
-            // 将原先的头节点的上⼀个节点指向新节点
-            f.prev = newNode;
-        }
-
-        // 节点数加1
-        size++;
-        // 和ArrayList中⼀样，iterator和listIterator⽅法返回的迭代器和列表迭代器实现使⽤
-        modCount++;
-    }
-
-    /**
-     * 将指定元素添加到链表尾
-     * @author liuzhen
-     * @date 2022/4/9 21:16
-     * @param e
-     * @return void
-     */
-    public void addLast(E e) {
-        linkLast(e);
-    }
-
-    /**
-     * 将节点插⼊到尾节点
-     */
-    void linkLast(E e) {
-        // 将l设为尾节点
-        final Node<E> l = last;
-        // 构造⼀个新节点，节点上⼀个节点引⽤指向尾节点l
-        final Node<E> newNode = new Node<>(l, e, null);
-        // 将尾节点设为创建的新节点
-        last = newNode;
-        // 如果尾节点为空，表示原先链表为空
-        if (l == null) {
-            // 将头节点设为新创建的节点（尾节点也是新创建的节点）
-            first = newNode;
-        } else {
-            // 将原来尾节点下⼀个节点的引⽤指向新节点
-            l.next = newNode;
-        }
-
-        // 节点数加1
-        size++;
-        // 和ArrayList中⼀样，iterator和listIterator⽅法返回的迭代器和列表迭代器实现使⽤。
-        modCount++;
-    }
-
-    /**
-     *
-     */
-    void linkBefore(E e, Node<E> succ) {
-        // 将pred设为插⼊节点的上⼀个节点
-        final Node<E> pred = succ.prev;
-        // 将新节点的上引⽤设为pred,下引⽤设为succ
-        final Node<E> newNode = new Node<>(pred, e, succ);
-        // succ的上⼀个节点的引⽤设为新节点
-        succ.prev = newNode;
-        // 如果插⼊节点的上⼀个节点引⽤为空
-        if (pred == null) {
-            // 新节点就是头节点
-            first = newNode;
-        } else {
-            // 插⼊节点的下⼀个节点引⽤设为新节点
-            pred.next = newNode;
-        }
-
-        size++;
-        modCount++;
-    }
-
-    /**
-     * 找到index里的node
-     * @param index
-     * @return
-     */
-    Node<E> node(int index) {
-        // 如果插⼊的索引在前半部分
-        if (index < (size >> 1)) {
-            // 设x为头节点
-            Node<E> x = first;
-            //从开始节点到插⼊节点索引之间的所有节点向后移动⼀位
-            for (int i = 0; i < index; i++)
-                x = x.next;
-            return x;
-        } else { // 如果插⼊节点位置在后半部分
-            // 将x设为最后⼀个节点
-            Node<E> x = last;
-            // 从最后节点到插⼊节点的索引位置之间的所有节点向前移动⼀位
-            for (int i = size - 1; i > index; i--)
-                x = x.prev;
-            return x;
-        }
     }
 
     /**
@@ -446,32 +195,271 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
         return true;
     }
 
-    public boolean contains(Object o) {
-        return indexOf(o) >= 0;
-    }
-
-    public int size() {
-        return size;
-    }
-
-    public void clear() {
-        // Clearing all of the links between nodes is "unnecessary", but:
-        // - helps a generational GC if the discarded nodes inhabit
-        //   more than one generation
-        // - is sure to free memory even if there is a reachable Iterator
-        for (Node<E> x = first; x != null; ) {
-            Node<E> next = x.next;
-            x.item = null;
-            x.next = null;
-            x.prev = null;
-            x = next;
+    /**
+     * 将指定的元素附加到链表头节点
+     */
+    private void linkFirst(E e) {
+        // 将头节点赋值给 f
+        final Node<E> f = first;
+        // 将指定元素构造成⼀个新节点，此节点的指向下⼀个节点的引⽤为头节点
+        final Node<E> newNode = new Node<>(null, e, f);
+        // 将新节点设为头节点，那么原先的头节点 f 变为第⼆个节点
+        first = newNode;
+        // 如果第⼆个节点为空，也就是原先链表是空
+        if (f == null) {
+            // 将这个新节点也设为尾节点（前⾯已经设为头节点了）
+            last = newNode;
+        } else {
+            // 将原先的头节点的上⼀个节点指向新节点
+            f.prev = newNode;
         }
-        first = last = null;
-        size = 0;
+
+        // 节点数加1
+        size++;
+        // 和ArrayList中⼀样，iterator和listIterator⽅法返回的迭代器和列表迭代器实现使⽤
         modCount++;
     }
 
-    // Positional Access Operations
+    /**
+     * 将节点插⼊到尾节点
+     * @date 2022/7/23 17:21
+     * @param e
+     * @return void
+     */
+    void linkLast(E e) {
+        // 将l设为尾节点
+        final Node<E> l = last;
+        // 构造⼀个新节点，节点上⼀个节点引⽤指向尾节点l
+        final Node<E> newNode = new Node<>(l, e, null);
+        // 将尾节点设为创建的新节点
+        last = newNode;
+        // 如果尾节点为空，表示原先链表为空
+        if (l == null) {
+            // 将头节点设为新创建的节点（尾节点也是新创建的节点）
+            first = newNode;
+        } else {
+            // 将原来尾节点下⼀个节点的引⽤指向新节点
+            l.next = newNode;
+        }
+
+        // 节点数加1
+        size++;
+        // 和ArrayList中⼀样，iterator和listIterator⽅法返回的迭代器和列表迭代器实现使⽤。
+        modCount++;
+    }
+
+    /**
+     *
+     */
+    void linkBefore(E e, Node<E> succ) {
+        // 将pred设为插⼊节点的上⼀个节点
+        final Node<E> pred = succ.prev;
+        // 将新节点的上引⽤设为pred,下引⽤设为succ
+        final Node<E> newNode = new Node<>(pred, e, succ);
+        // succ的上⼀个节点的引⽤设为新节点
+        succ.prev = newNode;
+        // 如果插⼊节点的上⼀个节点引⽤为空
+        if (pred == null) {
+            // 新节点就是头节点
+            first = newNode;
+        } else {
+            // 插⼊节点的下⼀个节点引⽤设为新节点
+            pred.next = newNode;
+        }
+
+        size++;
+        modCount++;
+    }
+
+    // 删除元素 ---------------------------------------------------------------->
+
+    /**
+     * 删除元素
+     * @author liuzhen
+     * @date 2022/4/9 21:39
+     * @param
+     * @return E
+     */
+    public E remove() {
+        return removeFirst();
+    }
+
+    public E remove(int index) {
+        checkElementIndex(index);
+
+        return unlink(node(index));
+    }
+
+    /**
+     *
+     * 如果存在，则从该列表中删除指定元素的第⼀次出现
+     * 此⽅法本质上和 remove(int index) 没多⼤区别，通过循环判断元素进⾏删除，需要注意的是，是删除第⼀次出现的元素，不是所有的
+     * @author liuzhen
+     * @date 2022/4/9 22:01
+     * @param o
+     * @return boolean
+     */
+    public boolean remove(Object o) {
+        if (o == null) {
+            for (Node<E> x = first; x != null; x = x.next) {
+                if (x.item == null) {
+                    unlink(x);
+                    return true;
+                }
+            }
+        } else {
+            for (Node<E> x = first; x != null; x = x.next) {
+                if (o.equals(x.item)) {
+                    unlink(x);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 从此列表中移除并返回第⼀个元素
+     */
+    public E removeFirst() {
+        // f设为头结点
+        final Node<E> f = first;
+        // 如果头结点为空，则抛出异常
+        if (f == null)
+            throw new NoSuchElementException();
+        return unlinkFirst(f);
+    }
+
+    /**
+     * 从该列表中删除并返回最后⼀个元素
+     * @author liuzhen
+     * @date 2022/4/9 21:44
+     * @param
+     * @return E
+     */
+    public E removeLast() {
+        final Node<E> l = last;
+        // 如果尾节点为空，表示当前集合为空，抛出异常
+        if (l == null)
+            throw new NoSuchElementException();
+
+        return unlinkLast(l);
+    }
+
+    /**
+     *
+     */
+    E unlink(Node<E> x) {
+        // assert x != null;
+        final E element = x.item;
+        final Node<E> next = x.next;
+        final Node<E> prev = x.prev;
+
+        if (prev == null) {
+            first = next;
+        } else {
+            prev.next = next;
+            x.prev = null;
+        }
+
+        if (next == null) {
+            last = prev;
+        } else {
+            next.prev = prev;
+            x.next = null;
+        }
+
+        x.item = null;
+        size--;
+        modCount++;
+        return element;
+    }
+
+    /**
+     *
+     * @date 2022/7/23 17:12
+     * @param f
+     * @return E
+     */
+    private E unlinkFirst(Node<E> f) {
+        // assert f == first && f != null;
+        final E element = f.item;
+        // next 为头结点的下⼀个节点
+        final Node<E> next = f.next;
+        f.item = null;
+        // 将节点的元素以及引⽤都设为 null，便于垃圾回收
+        f.next = null; // help GC
+        // 修改头结点为第⼆个节点
+        first = next;
+
+        // 如果第⼆个节点为空（当前链表只存在第⼀个元素）
+        if (next == null) {
+            // 那么尾节点也置为 null
+            last = null;
+        } else {
+            // 如果第⼆个节点不为空，那么将第⼆个节点的上⼀个引⽤置为 null
+            next.prev = null;
+        }
+
+        size--;
+        modCount++;
+        return element;
+    }
+
+    /**
+     *
+     */
+    private E unlinkLast(Node<E> l) {
+        // assert l == last && l != null;
+        final E element = l.item;
+        final Node<E> prev = l.prev;
+        l.item = null;
+        // 将节点的元素以及引⽤都设为 null，便于垃圾回收
+        l.prev = null; // help GC
+        // 尾节点为倒数第⼆个节点
+        last = prev;
+
+        // 如果倒数第⼆个节点为null
+        if (prev == null) {
+            // 那么将节点也置为 null
+            first = null;
+        } else {
+            // 如果倒数第⼆个节点不为空，那么将倒数第⼆个节点的下⼀个引⽤置为 null
+            prev.next = null;
+        }
+
+        size--;
+        modCount++;
+
+        return element;
+    }
+
+
+    /**
+     * 找到index里的node
+     * @param index
+     * @return
+     */
+    Node<E> node(int index) {
+        // 如果插⼊的索引在前半部分
+        if (index < (size >> 1)) {
+            // 设x为头节点
+            Node<E> x = first;
+            //从开始节点到插⼊节点索引之间的所有节点向后移动⼀位
+            for (int i = 0; i < index; i++)
+                x = x.next;
+            return x;
+        } else { // 如果插⼊节点位置在后半部分
+            // 将x设为最后⼀个节点
+            Node<E> x = last;
+            // 从最后节点到插⼊节点的索引位置之间的所有节点向前移动⼀位
+            for (int i = size - 1; i > index; i--)
+                x = x.prev;
+            return x;
+        }
+    }
+
+    // 获取元素 ---------------------------------------------------------------->
 
     /**
      * 返回指定索引处的元素
@@ -546,29 +534,33 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
         return oldVal;
     }
 
-    private boolean isElementIndex(int index) {
-        return index >= 0 && index < size;
+
+    // =================================================================================>
+
+    public boolean contains(Object o) {
+        return indexOf(o) >= 0;
     }
 
-    private boolean isPositionIndex(int index) {
-        return index >= 0 && index <= size;
+    public int size() {
+        return size;
     }
 
-    private String outOfBoundsMsg(int index) {
-        return "Index: " + index + ", Size: " + size;
+    public void clear() {
+        // Clearing all of the links between nodes is "unnecessary", but:
+        // - helps a generational GC if the discarded nodes inhabit
+        //   more than one generation
+        // - is sure to free memory even if there is a reachable Iterator
+        for (Node<E> x = first; x != null; ) {
+            Node<E> next = x.next;
+            x.item = null;
+            x.next = null;
+            x.prev = null;
+            x = next;
+        }
+        first = last = null;
+        size = 0;
+        modCount++;
     }
-
-    private void checkElementIndex(int index) {
-        if (!isElementIndex(index))
-            throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
-    }
-
-    private void checkPositionIndex(int index) {
-        if (!isPositionIndex(index))
-            throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
-    }
-
-    // Search Operations
 
     /**
      * 返回此列表中指定元素第⼀次出现的索引，如果此列表不包含元素，则返回-1。
@@ -618,8 +610,7 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
         return -1;
     }
 
-    // Queue operations.
-
+    // 其他 添加 删除 获取 api =========================>
     public E peek() {
         final Node<E> f = first;
         return (f == null) ? null : f.item;
@@ -627,11 +618,6 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
 
     public E element() {
         return getFirst();
-    }
-
-    public E poll() {
-        final Node<E> f = first;
-        return (f == null) ? null : unlinkFirst(f);
     }
 
     public boolean offer(E e) {
@@ -658,6 +644,11 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
     public E peekLast() {
         final Node<E> l = last;
         return (l == null) ? null : l.item;
+    }
+
+    public E poll() {
+        final Node<E> f = first;
+        return (f == null) ? null : unlinkFirst(f);
     }
 
     public E pollFirst() {
@@ -699,6 +690,107 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
             }
         }
         return false;
+    }
+
+    private boolean isElementIndex(int index) {
+        return index >= 0 && index < size;
+    }
+
+    private boolean isPositionIndex(int index) {
+        return index >= 0 && index <= size;
+    }
+
+    private String outOfBoundsMsg(int index) {
+        return "Index: " + index + ", Size: " + size;
+    }
+
+    private void checkElementIndex(int index) {
+        if (!isElementIndex(index))
+            throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
+    }
+
+    private void checkPositionIndex(int index) {
+        if (!isPositionIndex(index))
+            throw new IndexOutOfBoundsException(outOfBoundsMsg(index));
+    }
+
+    @SuppressWarnings("unchecked")
+    private LinkedList<E> superClone() {
+        try {
+            return (LinkedList<E>)super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new InternalError(e);
+        }
+    }
+
+    public Object clone() {
+        LinkedList<E> clone = superClone();
+
+        // Put clone into "virgin" state
+        clone.first = clone.last = null;
+        clone.size = 0;
+        clone.modCount = 0;
+
+        // Initialize clone with our elements
+        for (Node<E> x = first; x != null; x = x.next)
+            clone.add(x.item);
+
+        return clone;
+    }
+
+    public Object[] toArray() {
+        Object[] result = new Object[size];
+        int i = 0;
+        for (Node<E> x = first; x != null; x = x.next)
+            result[i++] = x.item;
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T[] toArray(T[] a) {
+        if (a.length < size)
+            a = (T[])java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
+        int i = 0;
+        Object[] result = a;
+        for (Node<E> x = first; x != null; x = x.next)
+            result[i++] = x.item;
+
+        if (a.length > size)
+            a[size] = null;
+
+        return a;
+    }
+
+    private static final long serialVersionUID = 876323262645176354L;
+
+    private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+        // Write out any hidden serialization magic
+        s.defaultWriteObject();
+
+        // Write out size
+        s.writeInt(size);
+
+        // Write out all elements in the proper order.
+        for (Node<E> x = first; x != null; x = x.next)
+            s.writeObject(x.item);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+        // Read in any hidden serialization magic
+        s.defaultReadObject();
+
+        // Read in size
+        int size = s.readInt();
+
+        // Read in all elements in the proper order.
+        for (int i = 0; i < size; i++)
+            linkLast((E)s.readObject());
+    }
+
+    @Override
+    public Spliterator<E> spliterator() {
+        return new LLSpliterator<>(this, -1, 0);
     }
 
     /**
@@ -841,85 +933,6 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private LinkedList<E> superClone() {
-        try {
-            return (LinkedList<E>)super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new InternalError(e);
-        }
-    }
-
-    public Object clone() {
-        LinkedList<E> clone = superClone();
-
-        // Put clone into "virgin" state
-        clone.first = clone.last = null;
-        clone.size = 0;
-        clone.modCount = 0;
-
-        // Initialize clone with our elements
-        for (Node<E> x = first; x != null; x = x.next)
-            clone.add(x.item);
-
-        return clone;
-    }
-
-    public Object[] toArray() {
-        Object[] result = new Object[size];
-        int i = 0;
-        for (Node<E> x = first; x != null; x = x.next)
-            result[i++] = x.item;
-        return result;
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T[] toArray(T[] a) {
-        if (a.length < size)
-            a = (T[])java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
-        int i = 0;
-        Object[] result = a;
-        for (Node<E> x = first; x != null; x = x.next)
-            result[i++] = x.item;
-
-        if (a.length > size)
-            a[size] = null;
-
-        return a;
-    }
-
-    private static final long serialVersionUID = 876323262645176354L;
-
-    private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
-        // Write out any hidden serialization magic
-        s.defaultWriteObject();
-
-        // Write out size
-        s.writeInt(size);
-
-        // Write out all elements in the proper order.
-        for (Node<E> x = first; x != null; x = x.next)
-            s.writeObject(x.item);
-    }
-
-    @SuppressWarnings("unchecked")
-    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
-        // Read in any hidden serialization magic
-        s.defaultReadObject();
-
-        // Read in size
-        int size = s.readInt();
-
-        // Read in all elements in the proper order.
-        for (int i = 0; i < size; i++)
-            linkLast((E)s.readObject());
-    }
-
-    @Override
-    public Spliterator<E> spliterator() {
-        return new LLSpliterator<>(this, -1, 0);
-    }
-
     static final class LLSpliterator<E> implements Spliterator<E> {
         static final int BATCH_UNIT = 1 << 10;  // batch array size increment
         static final int MAX_BATCH = 1 << 25;  // max batch array size;
@@ -1014,5 +1027,4 @@ public class LinkedList<E> extends AbstractSequentialList<E> implements List<E>,
             return Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED;
         }
     }
-
 }

@@ -8,7 +8,7 @@ package java.util;
 import java.util.function.Consumer;
 
 public abstract class AbstractList<E> extends AbstractCollection<E> implements List<E> {
-    /**  */
+    /** iterator和listIterator⽅法返回的迭代器和列表迭代器实现使⽤。记录集合被修改的次数主要⽤于迭代器中的快速失败 */
     protected transient int modCount = 0;
 
     protected AbstractList() {

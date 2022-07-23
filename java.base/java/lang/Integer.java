@@ -223,17 +223,23 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @date 2022/4/9 17:05
      */
     static int stringSize(int x) {
+        // 如果是负数，长度 +1
         int d = 1;
+        // 如果是整数，长度不用 +1
         if (x >= 0) {
+
             d = 0;
             x = -x;
         }
+
         int p = -10;
         for (int i = 1; i < 10; i++) {
             if (x > p)
                 return i + d;
             p = 10 * p;
         }
+
+        // 最大长度为 11
         return 10 + d;
     }
 
@@ -498,8 +504,9 @@ public final class Integer extends Number implements Comparable<Integer> {
     @HotSpotIntrinsicCandidate
     public static Integer valueOf(int i) {
         // 从缓存中取出来
-        if (i >= IntegerCache.low && i <= IntegerCache.high)
+        if (i >= IntegerCache.low && i <= IntegerCache.high) {
             return IntegerCache.cache[i + (-IntegerCache.low)];
+        }
         return new Integer(i);
     }
 

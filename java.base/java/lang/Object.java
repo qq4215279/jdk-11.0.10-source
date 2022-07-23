@@ -8,11 +8,9 @@ package java.lang;
 import jdk.internal.HotSpotIntrinsicCandidate;
 
 /** 
- *
+ * Object
  * @author liuzhen
  * @date 2022/4/10 23:38
- * @param null 
- * @return 
  */
 public class Object {
 

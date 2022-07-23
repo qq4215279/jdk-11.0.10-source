@@ -71,6 +71,15 @@ public class AtomicStampedReference<V> {
         return compareAndSet(expectedReference, newReference, expectedStamp, newStamp);
     }
 
+    /**
+     *
+     * @date 2022/7/20 7:04
+     * @param expectedReference 预期引用
+     * @param newReference 更新后的引用
+     * @param expectedStamp 预期标志
+     * @param newStamp 更新后的标志
+     * @return boolean
+     */
     public boolean compareAndSet(V expectedReference, V newReference, int expectedStamp, int newStamp) {
         Pair<V> current = pair;
         return expectedReference == current.reference && expectedStamp == current.stamp &&

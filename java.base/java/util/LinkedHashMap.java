@@ -148,6 +148,15 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return p;
     }
 
+    /**
+     *
+     * @date 2022/7/23 20:58
+     * @param hash
+     * @param key
+     * @param value
+     * @param next
+     * @return java.util.HashMap.TreeNode<K,V>
+     */
     TreeNode<K, V> newTreeNode(int hash, K key, V value, Node<K, V> next) {
         TreeNode<K, V> p = new TreeNode<>(hash, key, value, next);
         linkNodeLast(p);
@@ -281,6 +290,13 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         return e.value;
     }
 
+    /**
+     *
+     * @date 2022/7/23 20:57
+     * @param key
+     * @param defaultValue
+     * @return V
+     */
     public V getOrDefault(Object key, V defaultValue) {
         Node<K, V> e;
         if ((e = getNode(hash(key), key)) == null)

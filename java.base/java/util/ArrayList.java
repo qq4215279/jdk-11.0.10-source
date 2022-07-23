@@ -31,12 +31,11 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
      */
     transient Object[] elementData; // non-private to simplify nested class access
 
-    /** 集合的默认⼤⼩（初始容量） */
-    private static final int DEFAULT_CAPACITY = 10;
-
     /** 表示集合的⻓度 */
     private int size;
 
+    /** 集合的默认⼤⼩（初始容量） */
+    private static final int DEFAULT_CAPACITY = 10;
     /** 集合最大长度 */
     private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
 
@@ -108,14 +107,32 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         }
     }
 
+    /**
+     * 扩容
+     * @date 2022/7/23 16:32
+     * @param
+     * @return java.lang.Object[]
+     */
     private Object[] grow() {
         return grow(size + 1);
     }
 
+    /**
+     * 扩容
+     * @date 2022/7/23 16:33
+     * @param minCapacity
+     * @return java.lang.Object[]
+     */
     private Object[] grow(int minCapacity) {
         return elementData = Arrays.copyOf(elementData, newCapacity(minCapacity));
     }
 
+    /**
+     * 返回新数组的长度
+     * @date 2022/7/23 16:32
+     * @param minCapacity
+     * @return int
+     */
     private int newCapacity(int minCapacity) {
         // 得到原始数组的⻓度
         int oldCapacity = elementData.length;
@@ -125,11 +142,15 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         // 当新数组⻓度仍然⽐minCapacity⼩，则为保证最⼩⻓度，新数组等于minCapacity
         if (newCapacity - minCapacity <= 0) {
             // 当前集合为空
-            if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA)
+            if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
                 // 返回默认容量 与 需求容量的较大值
                 return Math.max(DEFAULT_CAPACITY, minCapacity);
-            if (minCapacity < 0) // overflow
+            }
+
+            if (minCapacity < 0){ // overflow
                 throw new OutOfMemoryError();
+            }
+
             return minCapacity;
         }
 
@@ -397,6 +418,13 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
         return true;
     }
 
+    /**
+     * 快速删除
+     * @date 2022/7/23 16:50
+     * @param es
+     * @param i
+     * @return void
+     */
     private void fastRemove(Object[] es, int i) {
         modCount++;
 
