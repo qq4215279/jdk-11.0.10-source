@@ -20,22 +20,23 @@ import java.util.concurrent.locks.LockSupport;
  * @return
  */
 public class Exchanger<V> {
-
     private static final int ASHIFT = 5;
-
     private static final int MMASK = 0xff;
-
     private static final int SEQ = MMASK + 1;
-
     private static final int NCPU = Runtime.getRuntime().availableProcessors();
-
     static final int FULL = (NCPU >= (MMASK << 1)) ? MMASK : NCPU >>> 1;
-
     private static final int SPINS = 1 << 10;
-
     private static final Object NULL_ITEM = new Object();
-
     private static final Object TIMED_OUT = new Object();
+
+    
+    private final Participant participant;
+
+    private volatile Node[] arena;
+
+    private volatile Node slot;
+
+    private volatile int bound;
 
     /**
      * 添加了Contended注解，表示伪共享与缓存行填充
@@ -62,125 +63,6 @@ public class Exchanger<V> {
         }
     }
 
-    private final Participant participant;
-
-    private volatile Node[] arena;
-
-    private volatile Node slot;
-
-    private volatile int bound;
-
-    /** 
-     * 当启用arenas的时候，使用该方法进行线程间的数据交换。
-     * @author liuzhen
-     * @date 2022/4/16 18:20 
-     * @param item 本线程要交换的非null数据。
-     * @param timed 如果需要计时等待，则设置为true。
-     * @param ns 表示计时等待的最大时长。
-     * @return 对方线程交换来的数据。如果线程被中断，或者等待超时，则返回null。
-     */
-    private final Object arenaExchange(Object item, boolean timed, long ns) {
-        Node[] a = arena;
-        int alen = a.length;
-        Node p = participant.get();
-
-        // 访问下标为i处的slot数据
-        for (int i = p.index; ; ) {                      // access slot at i
-            int b, m, c;
-            int j = (i << ASHIFT) + ((1 << ASHIFT) - 1);
-            if (j < 0 || j >= alen)
-                j = alen - 1;
-
-            // 取出arena数组的第j个Node元素
-            Node q = (Node)AA.getAcquire(a, j);
-            // 如果q不是null，则将数组的第j个元素由q设置为null
-            if (q != null && AA.compareAndSet(a, j, q, null)) {
-                // 获取对方线程交换来的数据
-                Object v = q.item;                     // release
-                // 设置本方线程交换的数据
-                q.match = item;
-                // 获取对方线程对象
-                Thread w = q.parked;
-                if (w != null)
-                    // 如果对方线程非空，则唤醒对方线程
-                    LockSupport.unpark(w);
-                return v;
-            } else if (i <= (m = (b = bound) & MMASK) && q == null) { // 如果自旋次数没达到边界，且q为null
-                // 提供本方数据
-                p.item = item;                         // offer
-                // 将arena的第j个元素由null设置为p
-                if (AA.compareAndSet(a, j, null, p)) {
-                    long end = (timed && m == 0) ? System.nanoTime() + ns : 0L;
-                    Thread t = Thread.currentThread(); // wait
-
-                    // 自旋等待
-                    for (int h = p.hash, spins = SPINS; ; ) {
-                        // 获取对方交换来的数据
-                        Object v = p.match;
-                        // 如果对方交换来的数据非空
-                        if (v != null) {
-                            // 将p设置为null，CAS操作
-                            MATCH.setRelease(p, null);
-                            // 清空
-                            p.item = null;             // clear for next use
-                            p.hash = h;
-                            // 返回交换来的数据
-                            return v;
-                        } else if (spins > 0) { // 产生随机数，用于限制自旋次数
-                            h ^= h << 1;
-                            h ^= h >>> 3;
-                            h ^= h << 10; // xorshift
-                            if (h == 0)                // initialize hash
-                                h = SPINS | (int)t.getId();
-                            else if (h < 0 &&          // approx 50% true
-                                     (--spins & ((SPINS >>> 1) - 1)) == 0)
-                                Thread.yield();        // two yields per wait
-                        } else if (AA.getAcquire(a, j) != p) // 如果arena的第j个元素不是p
-                            spins = SPINS;       // releaser hasn't set match yet
-                        else if (!t.isInterrupted() && m == 0 && (!timed || (ns = end - System.nanoTime()) > 0L)) {
-                            p.parked = t;              // minimize window
-                            if (AA.getAcquire(a, j) == p) {
-                                if (ns == 0L)
-                                    // 当前线程阻塞，等待交换数据
-                                    LockSupport.park(this);
-                                else
-                                    LockSupport.parkNanos(this, ns);
-                            }
-                            p.parked = null;
-                        }
-                        // arena的第j个元素是p并且CAS设置arena的第j个元素由p设置 为null成功
-                        else if (AA.getAcquire(a, j) == p && AA.compareAndSet(a, j, p, null)) {
-                            if (m != 0)                // try to shrink
-                                BOUND.compareAndSet(this, b, b + SEQ - 1);
-                            p.item = null;
-                            p.hash = h;
-                            i = p.index >>>= 1;        // descend
-                            // 如果线程被中断，则返回null值
-                            if (Thread.interrupted())
-                                return null;
-                            // 如果超时，返回TIMED_OUT。
-                            if (timed && m == 0 && ns <= 0L)
-                                return TIMED_OUT;
-                            break;                     // expired; restart
-                        }
-                    }
-                } else
-                    p.item = null;                     // clear offer
-            } else {
-                if (p.bound != b) {                    // stale; reset
-                    p.bound = b;
-                    p.collides = 0;
-                    i = (i != m || m == 0) ? m : m - 1;
-                } else if ((c = p.collides) < m || m == FULL || !BOUND.compareAndSet(this, b, b + SEQ + 1)) {
-                    p.collides = c + 1;
-                    i = (i == 0) ? m : i - 1;          // cyclically traverse
-                } else
-                    i = m + 1;                         // grow
-                p.index = i;
-            }
-        }
-    }
-
     public Exchanger() {
         participant = new Participant();
     }
@@ -200,8 +82,8 @@ public class Exchanger<V> {
         Object v;
         Node[] a;
         Object item = (x == null) ? NULL_ITEM : x; // translate null args
-        if (((a = arena) != null || (v = slotExchange(item, false, 0L)) == null) && ((Thread.interrupted() || // disambiguates null return
-                                                                                      (v = arenaExchange(item, false, 0L)) == null)))
+        if (((a = arena) != null || (v = slotExchange(item, false, 0L)) == null)
+            && ((Thread.interrupted() || (v = arenaExchange(item, false, 0L)) == null)))
             throw new InterruptedException();
         return (v == NULL_ITEM) ? null : (V)v;
     }
@@ -211,11 +93,123 @@ public class Exchanger<V> {
         Object v;
         Object item = (x == null) ? NULL_ITEM : x;
         long ns = unit.toNanos(timeout);
-        if ((arena != null || (v = slotExchange(item, true, ns)) == null) && ((Thread.interrupted() || (v = arenaExchange(item, true, ns)) == null)))
+        if ((arena != null || (v = slotExchange(item, true, ns)) == null)
+            && ((Thread.interrupted() || (v = arenaExchange(item, true, ns)) == null)))
             throw new InterruptedException();
         if (v == TIMED_OUT)
             throw new TimeoutException();
         return (v == NULL_ITEM) ? null : (V)v;
+    }
+
+    /**
+     * 当启用arenas的时候，使用该方法进行线程间的数据交换。
+     * @author liuzhen
+     * @date 2022/4/16 18:20
+     * @param item 本线程要交换的非null数据。
+     * @param timed 如果需要计时等待，则设置为true。
+     * @param ns 表示计时等待的最大时长。
+     * @return 对方线程交换来的数据。如果线程被中断，或者等待超时，则返回null。
+     */
+    private final Object arenaExchange(Object item, boolean timed, long ns) {
+        Node[] a = arena;
+        int alen = a.length;
+        Node p = participant.get();
+
+        // 访问下标为i处的slot数据
+        for (int i = p.index;;) { // access slot at i
+            int b, m, c;
+            int j = (i << ASHIFT) + ((1 << ASHIFT) - 1);
+            if (j < 0 || j >= alen)
+                j = alen - 1;
+
+            // 取出arena数组的第j个Node元素
+            Node q = (Node)AA.getAcquire(a, j);
+            // 如果q不是null，则将数组的第j个元素由q设置为null
+            if (q != null && AA.compareAndSet(a, j, q, null)) {
+                // 获取对方线程交换来的数据
+                Object v = q.item; // release
+                // 设置本方线程交换的数据
+                q.match = item;
+                // 获取对方线程对象
+                Thread w = q.parked;
+                if (w != null)
+                    // 如果对方线程非空，则唤醒对方线程
+                    LockSupport.unpark(w);
+                return v;
+            } else if (i <= (m = (b = bound) & MMASK) && q == null) { // 如果自旋次数没达到边界，且q为null
+                // 提供本方数据
+                p.item = item; // offer
+                // 将arena的第j个元素由null设置为p
+                if (AA.compareAndSet(a, j, null, p)) {
+                    long end = (timed && m == 0) ? System.nanoTime() + ns : 0L;
+                    Thread t = Thread.currentThread(); // wait
+
+                    // 自旋等待
+                    for (int h = p.hash, spins = SPINS;;) {
+                        // 获取对方交换来的数据
+                        Object v = p.match;
+                        // 如果对方交换来的数据非空
+                        if (v != null) {
+                            // 将p设置为null，CAS操作
+                            MATCH.setRelease(p, null);
+                            // 清空
+                            p.item = null; // clear for next use
+                            p.hash = h;
+                            // 返回交换来的数据
+                            return v;
+                        } else if (spins > 0) { // 产生随机数，用于限制自旋次数
+                            h ^= h << 1;
+                            h ^= h >>> 3;
+                            h ^= h << 10; // xorshift
+                            if (h == 0) // initialize hash
+                                h = SPINS | (int)t.getId();
+                            else if (h < 0 && // approx 50% true
+                                (--spins & ((SPINS >>> 1) - 1)) == 0)
+                                Thread.yield(); // two yields per wait
+                        } else if (AA.getAcquire(a, j) != p) // 如果arena的第j个元素不是p
+                            spins = SPINS; // releaser hasn't set match yet
+                        else if (!t.isInterrupted() && m == 0 && (!timed || (ns = end - System.nanoTime()) > 0L)) {
+                            p.parked = t; // minimize window
+                            if (AA.getAcquire(a, j) == p) {
+                                if (ns == 0L)
+                                    // 当前线程阻塞，等待交换数据
+                                    LockSupport.park(this);
+                                else
+                                    LockSupport.parkNanos(this, ns);
+                            }
+                            p.parked = null;
+                        }
+                        // arena的第j个元素是p并且CAS设置arena的第j个元素由p设置 为null成功
+                        else if (AA.getAcquire(a, j) == p && AA.compareAndSet(a, j, p, null)) {
+                            if (m != 0) // try to shrink
+                                BOUND.compareAndSet(this, b, b + SEQ - 1);
+                            p.item = null;
+                            p.hash = h;
+                            i = p.index >>>= 1; // descend
+                            // 如果线程被中断，则返回null值
+                            if (Thread.interrupted())
+                                return null;
+                            // 如果超时，返回TIMED_OUT。
+                            if (timed && m == 0 && ns <= 0L)
+                                return TIMED_OUT;
+                            break; // expired; restart
+                        }
+                    }
+                } else
+                    p.item = null; // clear offer
+            } else {
+                if (p.bound != b) { // stale; reset
+                    p.bound = b;
+                    p.collides = 0;
+                    i = (i != m || m == 0) ? m : m - 1;
+                } else if ((c = p.collides) < m || m == FULL || !BOUND.compareAndSet(this, b, b + SEQ + 1)) {
+                    p.collides = c + 1;
+                    i = (i == 0) ? m : i - 1; // cyclically traverse
+                } else
+                    i = m + 1; // grow
+                p.index = i;
+            }
+        }
     }
 
     /**
@@ -239,7 +233,7 @@ public class Exchanger<V> {
         if (t.isInterrupted()) // preserve interrupt status so caller can recheck
             return null;
 
-        for (Node q; ; ) {
+        for (Node q;;) {
             // 如果slot非空，表明有其他线程在等待该线程交换数据
             if ((q = slot) != null) {
                 // CAS操作，将当前线程的slot由slot设置为null
@@ -305,8 +299,7 @@ public class Exchanger<V> {
                     if (ns == 0L) {
                         // 阻塞当前线程
                         LockSupport.park(this);
-                    }
-                    else
+                    } else
                         // 如果是计时等待，则阻塞当前线程指定时间
                         LockSupport.parkNanos(this, ns);
                 }

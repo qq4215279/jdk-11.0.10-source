@@ -19,11 +19,24 @@ public class LongAccumulator extends Striped64 implements Serializable {
     private final LongBinaryOperator function;
     private final long identity;
 
+    /**
+     *
+     * @date 2022/7/24 15:37
+     * @param accumulatorFunction
+     * @param identity
+     * @return
+     */
     public LongAccumulator(LongBinaryOperator accumulatorFunction, long identity) {
         this.function = accumulatorFunction;
         base = this.identity = identity;
     }
 
+    /**
+     *
+     * @date 2022/7/24 15:35
+     * @param x
+     * @return void
+     */
     public void accumulate(long x) {
         Cell[] cs;
         long b, v, r;
@@ -31,9 +44,8 @@ public class LongAccumulator extends Striped64 implements Serializable {
         Cell c;
         if ((cs = cells) != null || ((r = function.applyAsLong(b = base, x)) != b && !casBase(b, r))) {
             boolean uncontended = true;
-            if (cs == null || (m = cs.length - 1) < 0 || (c = cs[getProbe() & m]) == null || !(uncontended = (r = function.applyAsLong(v = c.value,
-                                                                                                                                       x)) == v ||
-                                                                                                             c.cas(v, r)))
+            if (cs == null || (m = cs.length - 1) < 0 || (c = cs[getProbe() & m]) == null
+                || !(uncontended = (r = function.applyAsLong(v = c.value, x)) == v || c.cas(v, r)))
                 longAccumulate(x, function, uncontended);
         }
     }
@@ -93,6 +105,14 @@ public class LongAccumulator extends Striped64 implements Serializable {
         return (double)get();
     }
 
+    private Object writeReplace() {
+        return new SerializationProxy(get(), function, identity);
+    }
+
+    private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+        throw new java.io.InvalidObjectException("Proxy required");
+    }
+
     private static class SerializationProxy implements Serializable {
         private static final long serialVersionUID = 7249069246863182397L;
 
@@ -113,14 +133,6 @@ public class LongAccumulator extends Striped64 implements Serializable {
             a.base = value;
             return a;
         }
-    }
-
-    private Object writeReplace() {
-        return new SerializationProxy(get(), function, identity);
-    }
-
-    private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
-        throw new java.io.InvalidObjectException("Proxy required");
     }
 
 }

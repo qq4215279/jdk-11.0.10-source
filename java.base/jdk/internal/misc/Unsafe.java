@@ -699,10 +699,11 @@ public final class Unsafe {
      *
      * @author liuzhen
      * @date 2022/4/16 19:17
-     * @param o
-     * @param offset
-     * @param expected
-     * @param x
+     * @param o 第一个参数表示要修改哪个对象的属性值；
+     * @param offset 第二个参数是该对象属性在内存的偏移量；它是一个long型的整数，经常被称为xxxOffset，意思是某个成员变量
+     *  在对应的类中的内存偏移量（该变量在内存中的位置），表示该成员变量本身。
+     * @param expected 第三个参数表示期望值；
+     * @param x 第四个参数表示要设置为的目标值。
      * @return boolean
      */
     @HotSpotIntrinsicCandidate
@@ -959,6 +960,15 @@ public final class Unsafe {
         return weakCompareAndSetInt(o, offset, Float.floatToRawIntBits(expected), Float.floatToRawIntBits(x));
     }
 
+    /**
+     *
+     * @date 2022/7/24 14:43
+     * @param o
+     * @param offset
+     * @param expected
+     * @param x
+     * @return boolean
+     */
     @ForceInline
     public final boolean compareAndSetDouble(Object o, long offset, double expected, double x) {
         return compareAndSetLong(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
@@ -1007,6 +1017,15 @@ public final class Unsafe {
         return weakCompareAndSetLong(o, offset, Double.doubleToRawLongBits(expected), Double.doubleToRawLongBits(x));
     }
 
+    /**
+     *
+     * @date 2022/7/24 14:30
+     * @param o 要修改的对象
+     * @param offset 对象的成员变量在内存中的位置（一个long型的整数）
+     * @param expected 是该变量的旧值
+     * @param x 该变量的新值。
+     * @return boolean
+     */
     @HotSpotIntrinsicCandidate
     public final native boolean compareAndSetLong(Object o, long offset, long expected, long x);
 

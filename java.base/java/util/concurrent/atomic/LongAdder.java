@@ -25,6 +25,28 @@ public class LongAdder extends Striped64 implements Serializable {
     }
 
     /**
+     *
+     * @author liuzhen
+     * @date 2022/4/17 12:57
+     * @param
+     * @return void
+     */
+    public void increment() {
+        add(1L);
+    }
+
+    /**
+     *
+     * @author liuzhen
+     * @date 2022/4/17 12:57
+     * @param
+     * @return void
+     */
+    public void decrement() {
+        add(-1L);
+    }
+
+    /**
      * 核心方法
      * 当一个线程调用add(x)的时候，首先会尝试使用casBase把x加到base变量上。如果不成功，则再用c.cas(...)方法尝试把 x 加到 Cell 数组的某个元素上。
      * 如果还不成功，最后再调用longAccumulate(...)方法。
@@ -48,31 +70,10 @@ public class LongAdder extends Striped64 implements Serializable {
         if ((cs = cells) != null || !casBase(b = base, b + x)) {
             boolean uncontended = true;
             // 第二次尝试
-            if (cs == null || (m = cs.length - 1) < 0 || (c = cs[getProbe() & m]) == null || !(uncontended = c.cas(v = c.value, v + x)))
+            if (cs == null || (m = cs.length - 1) < 0 || (c = cs[getProbe() & m]) == null
+                || !(uncontended = c.cas(v = c.value, v + x)))
                 longAccumulate(x, null, uncontended);
         }
-    }
-
-    /**
-     *
-     * @author liuzhen
-     * @date 2022/4/17 12:57
-     * @param
-     * @return void
-     */
-    public void increment() {
-        add(1L);
-    }
-
-    /**
-     *
-     * @author liuzhen
-     * @date 2022/4/17 12:57
-     * @param
-     * @return void
-     */
-    public void decrement() {
-        add(-1L);
     }
 
     /**

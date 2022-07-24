@@ -12,14 +12,21 @@ import java.util.function.DoubleBinaryOperator;
 import java.util.function.LongBinaryOperator;
 
 /**
- * 从JDK 8开始，针对Long型的原子操作，Java又提供了LongAdder、LongAccumulator；针对
- * Double类型，Java提供了DoubleAdder、DoubleAccumulator。
+ * 从JDK 8开始，针对 Long 型的原子操作，Java又提供了LongAdder、LongAccumulator；
+ * 针对 Double 类型，Java提供了DoubleAdder、DoubleAccumulator。
  * Striped64相关的类的继承层次如下：LongAdder  LongAccumulator  DoubleAdder  DoubleAccumulator
  * @author liuzhen
  * @date 2022/4/17 11:59
  */
 @SuppressWarnings("serial")
 abstract class Striped64 extends Number {
+    static final int NCPU = Runtime.getRuntime().availableProcessors();
+
+    transient volatile Cell[] cells;
+
+    transient volatile long base;
+
+    transient volatile int cellsBusy;
 
     @jdk.internal.vm.annotation.Contended
     static final class Cell {
@@ -58,39 +65,7 @@ abstract class Striped64 extends Number {
         }
     }
 
-    static final int NCPU = Runtime.getRuntime().availableProcessors();
-
-    transient volatile Cell[] cells;
-
-    transient volatile long base;
-
-    transient volatile int cellsBusy;
-
     Striped64() {
-    }
-
-    final boolean casBase(long cmp, long val) {
-        return BASE.compareAndSet(this, cmp, val);
-    }
-
-    final long getAndSetBase(long val) {
-        return (long)BASE.getAndSet(this, val);
-    }
-
-    final boolean casCellsBusy() {
-        return CELLSBUSY.compareAndSet(this, 0, 1);
-    }
-
-    static final int getProbe() {
-        return (int)THREAD_PROBE.get(Thread.currentThread());
-    }
-
-    static final int advanceProbe(int probe) {
-        probe ^= probe << 13;   // xorshift
-        probe ^= probe >>> 17;
-        probe ^= probe << 5;
-        THREAD_PROBE.set(Thread.currentThread(), probe);
-        return probe;
     }
 
     /**
@@ -194,12 +169,14 @@ abstract class Striped64 extends Number {
         }
     }
 
-    private static long apply(DoubleBinaryOperator fn, long v, double x) {
-        double d = Double.longBitsToDouble(v);
-        d = (fn == null) ? d + x : fn.applyAsDouble(d, x);
-        return Double.doubleToRawLongBits(d);
-    }
-
+    /**
+     *
+     * @date 2022/7/24 15:31
+     * @param x
+     * @param fn
+     * @param wasUncontended
+     * @return void
+     */
     final void doubleAccumulate(double x, DoubleBinaryOperator fn, boolean wasUncontended) {
         int h;
         if ((h = getProbe()) == 0) {
@@ -268,6 +245,36 @@ abstract class Striped64 extends Number {
             else if (casBase(v = base, apply(fn, v, x)))
                 break done;
         }
+    }
+
+    final boolean casBase(long cmp, long val) {
+        return BASE.compareAndSet(this, cmp, val);
+    }
+
+    final long getAndSetBase(long val) {
+        return (long)BASE.getAndSet(this, val);
+    }
+
+    final boolean casCellsBusy() {
+        return CELLSBUSY.compareAndSet(this, 0, 1);
+    }
+
+    static final int getProbe() {
+        return (int)THREAD_PROBE.get(Thread.currentThread());
+    }
+
+    static final int advanceProbe(int probe) {
+        probe ^= probe << 13;   // xorshift
+        probe ^= probe >>> 17;
+        probe ^= probe << 5;
+        THREAD_PROBE.set(Thread.currentThread(), probe);
+        return probe;
+    }
+
+    private static long apply(DoubleBinaryOperator fn, long v, double x) {
+        double d = Double.longBitsToDouble(v);
+        d = (fn == null) ? d + x : fn.applyAsDouble(d, x);
+        return Double.doubleToRawLongBits(d);
     }
 
     // VarHandle mechanics

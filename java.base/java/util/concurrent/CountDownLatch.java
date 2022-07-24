@@ -36,7 +36,14 @@ public class CountDownLatch {
             return getState();
         }
 
+        /** 
+         *
+         * @date 2022/7/24 0:10
+         * @param acquires 
+         * @return int
+         */
         protected int tryAcquireShared(int acquires) {
+            // 只要state != 0，调用await()方法的线程便会被放入AQS的阻塞队列，进入阻塞状态。
             return (getState() == 0) ? 1 : -1;
         }
 
@@ -58,6 +65,7 @@ public class CountDownLatch {
                     return nextc == 0;
             }
         }
+        
     }
 
     public CountDownLatch(int count) {
@@ -77,6 +85,7 @@ public class CountDownLatch {
         // AQS的模板方法
         sync.acquireSharedInterruptibly(1);
     }
+
 
     public boolean await(long timeout, TimeUnit unit) throws InterruptedException {
         return sync.tryAcquireSharedNanos(1, unit.toNanos(timeout));

@@ -659,7 +659,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     }
 
     /**
-     *
+     * 立马关闭线程池
      * @date 2022/6/20 21:48
      * @param
      * @return java.util.List<java.lang.Runnable>

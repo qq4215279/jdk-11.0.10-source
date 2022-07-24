@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
- *
+ * ThreadLocal
  * @date 2022/7/18 22:52
  */
 public class ThreadLocal<T> {
@@ -120,7 +120,7 @@ public class ThreadLocal<T> {
     }
 
     /**
-     *
+     * ThreadLocalMap
      * @date 2022/7/18 22:52
      */
     static class ThreadLocalMap {
@@ -244,7 +244,7 @@ public class ThreadLocal<T> {
          * @param key
          * @return void
          */
-        private void remove(ThreadLocal<?> key) {boolean compareAndSet( V
+        private void remove(ThreadLocal<?> key) {
             // 使用hash方式，计算当前ThreadLocal变量所在table数组位置
             Entry[] tab = table;
             int len = tab.length;

@@ -489,26 +489,205 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
-    protected final int getState() {
-        return state;
+    // ================================================================>
+
+    // Main exported methods
+
+    /**
+     * 尝试获取公平锁
+     * @date 2022/7/13 22:01
+     * @param arg
+     * @return boolean
+     */
+    protected boolean tryAcquire(int arg) {
+        throw new UnsupportedOperationException();
     }
 
-    protected final void setState(int newState) {
-        state = newState;
+    /**
+     * 尝试获取共享锁
+     * @date 2022/7/13 22:01
+     * @param arg
+     * @return int
+     */
+    protected int tryAcquireShared(int arg) {
+        throw new UnsupportedOperationException();
     }
 
-    protected final boolean compareAndSetState(int expect, int update) {
-        return STATE.compareAndSet(this, expect, update);
+    /**
+     *
+     * @date 2022/7/24 0:09
+     * @param arg
+     * @param nanosTimeout
+     * @return boolean
+     */
+    public final boolean tryAcquireSharedNanos(int arg, long nanosTimeout) throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        return tryAcquireShared(arg) >= 0 || doAcquireSharedNanos(arg, nanosTimeout);
     }
 
-    private Node enq(Node node) {
+    public final boolean tryAcquireNanos(int arg, long nanosTimeout) throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        return tryAcquire(arg) || doAcquireNanos(arg, nanosTimeout);
+    }
+
+    /**
+     * 尝试释放锁
+     * @date 2022/7/13 22:01
+     * @param arg
+     * @return boolean
+     */
+    protected boolean tryRelease(int arg) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * 尝试释放共享锁
+     * @date 2022/7/13 22:02
+     * @param arg
+     * @return boolean
+     */
+    protected boolean tryReleaseShared(int arg) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * 获取锁
+     * 创建节点，尝试将节点追加到队列尾部。获取tail节点，将tail节点的next设置为当前节点。如果tail不存在，就初始化队列。
+     * @author liuzhen
+     * @date 2022/4/17 17:37
+     * @param arg
+     * @return void
+     */
+    public final void acquire(int arg) {
+        // addWaiter(...)方法，就是为当前线程生成一个Node，然后把Node放入双向链表的尾部。
+        // 要注意的是，这只是把Thread对象放入了一个队列中而已，线程本身并未阻塞。
+        if (!tryAcquire(arg) && acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+            selfInterrupt();
+    }
+
+    public final void acquireInterruptibly(int arg) throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        if (!tryAcquire(arg))
+            doAcquireInterruptibly(arg);
+    }
+
+    /**
+     *
+     * @date 2022/6/19 19:04
+     * @param arg
+     * @return void
+     */
+    public final void acquireShared(int arg) {
+        if (tryAcquireShared(arg) < 0)
+            doAcquireShared(arg);
+    }
+
+    /**
+     * 从tryAcquireShared(...)方法的实现来看，只要state != 0，调用await()方法的线程便会被放入AQS的阻塞队列，进入阻塞状态。
+     *
+     * @param arg
+     * @return void
+     * @author liuzhen
+     * @date 2022/4/16 17:50
+     */
+    public final void acquireSharedInterruptibly(int arg) throws InterruptedException {
+        if (Thread.interrupted())
+            throw new InterruptedException();
+        // 被CountDownLatch.Sync实现
+        if (tryAcquireShared(arg) < 0)
+            doAcquireSharedInterruptibly(arg);
+    }
+
+    /**
+     * 释放锁
+     * @date 2022/6/17 21:16
+     * @param arg
+     * @return boolean
+     */
+    public final boolean release(int arg) {
+        if (tryRelease(arg)) {
+            Node h = head;
+            if (h != null && h.waitStatus != 0)
+                // 唤醒阻塞队列上的第一个
+                unparkSuccessor(h);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     *  AQS的模板方法
+     * @author liuzhen
+     * @date 2022/4/16 17:52
+     * @param arg
+     * @return boolean
+     */
+    public final boolean releaseShared(int arg) {
+        // 由CountDownLatch.Sync实现
+        if (tryReleaseShared(arg)) {
+            doReleaseShared();
+            return true;
+        }
+        return false;
+    }
+
+    private void doReleaseShared() {
+        for (; ; ) {
+            Node h = head;
+            if (h != null && h != tail) {
+                int ws = h.waitStatus;
+                if (ws == Node.SIGNAL) {
+                    if (!h.compareAndSetWaitStatus(Node.SIGNAL, 0))
+                        continue;            // loop to recheck cases
+                    unparkSuccessor(h);
+                } else if (ws == 0 && !h.compareAndSetWaitStatus(0, Node.PROPAGATE))
+                    continue;                // loop on failed CAS
+            }
+            if (h == head)                   // loop if head changed
+                break;
+        }
+    }
+
+    private void doAcquireSharedInterruptibly(int arg) throws InterruptedException {
+        final Node node = addWaiter(Node.SHARED);
+        try {
+            for (; ; ) {
+                final Node p = node.predecessor();
+                if (p == head) {
+                    int r = tryAcquireShared(arg);
+                    if (r >= 0) {
+                        setHeadAndPropagate(node, r);
+                        p.next = null; // help GC
+                        return;
+                    }
+                }
+                if (shouldParkAfterFailedAcquire(p, node) && parkAndCheckInterrupt())
+                    throw new InterruptedException();
+            }
+        } catch (Throwable t) {
+            cancelAcquire(node);
+            throw t;
+        }
+    }
+
+    /**
+     * addWaiter(...)方法，就是为当前线程生成一个Node，然后把Node放入双向链表的尾部。要注意的是，这只是把Thread对象放入了一个队列中而已，线程本身并未阻塞。
+     * @param mode
+     * @return
+     */
+    private Node addWaiter(Node mode) {
+        Node node = new Node(mode);
+
         for (; ; ) {
             Node oldTail = tail;
             if (oldTail != null) {
                 node.setPrevRelaxed(oldTail);
                 if (compareAndSetTail(oldTail, node)) {
                     oldTail.next = node;
-                    return oldTail;
+                    return node;
                 }
             } else {
                 initializeSyncQueue();
@@ -516,97 +695,9 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
-    private void setHead(Node node) {
-        head = node;
-        node.thread = null;
-        node.prev = null;
-    }
-
-    private void unparkSuccessor(Node node) {
-        int ws = node.waitStatus;
-        if (ws < 0)
-            node.compareAndSetWaitStatus(ws, 0);
-
-        Node s = node.next;
-        if (s == null || s.waitStatus > 0) {
-            s = null;
-            for (Node p = tail; p != node && p != null; p = p.prev)
-                if (p.waitStatus <= 0)
-                    s = p;
-        }
-        if (s != null)
-            LockSupport.unpark(s.thread);
-    }
-
-    private void setHeadAndPropagate(Node node, int propagate) {
-        Node h = head; // Record old head for check below
-        setHead(node);
-
-        if (propagate > 0 || h == null || h.waitStatus < 0 || (h = head) == null || h.waitStatus < 0) {
-            Node s = node.next;
-            if (s == null || s.isShared())
-                doReleaseShared();
-        }
-    }
-
-    // Utilities for various versions of acquire
-
-    private void cancelAcquire(Node node) {
-        // Ignore if node doesn't exist
-        if (node == null)
-            return;
-
-        node.thread = null;
-
-        // Skip cancelled predecessors
-        Node pred = node.prev;
-        while (pred.waitStatus > 0)
-            node.prev = pred = pred.prev;
-
-        Node predNext = pred.next;
-
-        node.waitStatus = Node.CANCELLED;
-
-        // If we are the tail, remove ourselves.
-        if (node == tail && compareAndSetTail(node, pred)) {
-            pred.compareAndSetNext(predNext, null);
-        } else {
-            // If successor needs signal, try to set pred's next-link
-            // so it will get one. Otherwise wake it up to propagate.
-            int ws;
-            if (pred != head && ((ws = pred.waitStatus) == Node.SIGNAL || (ws <= 0 && pred.compareAndSetWaitStatus(ws, Node.SIGNAL))) &&
-                pred.thread != null) {
-                Node next = node.next;
-                if (next != null && next.waitStatus <= 0)
-                    pred.compareAndSetNext(predNext, next);
-            } else {
-                unparkSuccessor(node);
-            }
-
-            node.next = node; // help GC
-        }
-    }
-
-    private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
-        int ws = pred.waitStatus;
-        if (ws == Node.SIGNAL)
-            return true;
-        if (ws > 0) {
-            do {
-                node.prev = pred = pred.prev;
-            } while (pred.waitStatus > 0);
-            pred.next = node;
-        } else {
-            pred.compareAndSetWaitStatus(ws, Node.SIGNAL);
-        }
-        return false;
-    }
-
-    static void selfInterrupt() {
-        Thread.currentThread().interrupt();
-    }
-
     // ================================================================>
+
+    // Queue inspection methods
 
     /**
      * 进入acquireQueued(...)，该线程被阻塞。在该方法返回的一刻，就是拿到锁的那一刻，也就是被唤醒的那一刻，此时会删除队列的第一个元素（head指针前移1个节点）。
@@ -768,128 +859,26 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
-    // Main exported methods
-
-    /**
-     * 尝试获取公平锁
-     * @date 2022/7/13 22:01
-     * @param arg
-     * @return boolean
-     */
-    protected boolean tryAcquire(int arg) {
-        throw new UnsupportedOperationException();
+    protected final int getState() {
+        return state;
     }
 
-    /**
-     * 尝试释放锁
-     * @date 2022/7/13 22:01
-     * @param arg
-     * @return boolean
-     */
-    protected boolean tryRelease(int arg) {
-        throw new UnsupportedOperationException();
+    protected final void setState(int newState) {
+        state = newState;
     }
 
-    /**
-     * 尝试获取共享锁
-     * @date 2022/7/13 22:01
-     * @param arg
-     * @return int
-     */
-    protected int tryAcquireShared(int arg) {
-        throw new UnsupportedOperationException();
+    protected final boolean compareAndSetState(int expect, int update) {
+        return STATE.compareAndSet(this, expect, update);
     }
 
-    /**
-     * 尝试释放共享锁
-     * @date 2022/7/13 22:02
-     * @param arg
-     * @return boolean
-     */
-    protected boolean tryReleaseShared(int arg) {
-        throw new UnsupportedOperationException();
-    }
-
-    protected boolean isHeldExclusively() {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * 获取锁
-     * 创建节点，尝试将节点追加到队列尾部。获取tail节点，将tail节点的next设置为当前节点。如果tail不存在，就初始化队列。
-     * @author liuzhen
-     * @date 2022/4/17 17:37
-     * @param arg
-     * @return void
-     */
-    public final void acquire(int arg) {
-        // addWaiter(...)方法，就是为当前线程生成一个Node，然后把Node放入双向链表的尾部。
-        // 要注意的是，这只是把Thread对象放入了一个队列中而已，线程本身并未阻塞。
-        if (!tryAcquire(arg) && acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
-            selfInterrupt();
-    }
-
-    public final void acquireInterruptibly(int arg) throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        if (!tryAcquire(arg))
-            doAcquireInterruptibly(arg);
-    }
-
-    public final boolean tryAcquireNanos(int arg, long nanosTimeout) throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        return tryAcquire(arg) || doAcquireNanos(arg, nanosTimeout);
-    }
-
-    /**
-     *
-     * @date 2022/6/19 19:04
-     * @param arg
-     * @return void
-     */
-    public final void acquireShared(int arg) {
-        if (tryAcquireShared(arg) < 0)
-            doAcquireShared(arg);
-    }
-
-    /**
-     * 从tryAcquireShared(...)方法的实现来看，只要state != 0，调用await()方法的线程便会被放入AQS的阻塞队列，进入阻塞状态。
-     *
-     * @param arg
-     * @return void
-     * @author liuzhen
-     * @date 2022/4/16 17:50
-     */
-    public final void acquireSharedInterruptibly(int arg) throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        // 被CountDownLatch.Sync实现
-        if (tryAcquireShared(arg) < 0)
-            doAcquireSharedInterruptibly(arg);
-    }
-
-    public final boolean tryAcquireSharedNanos(int arg, long nanosTimeout) throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        return tryAcquireShared(arg) >= 0 || doAcquireSharedNanos(arg, nanosTimeout);
-    }
-
-    /**
-     * addWaiter(...)方法，就是为当前线程生成一个Node，然后把Node放入双向链表的尾部。要注意的是，这只是把Thread对象放入了一个队列中而已，线程本身并未阻塞。
-     * @param mode
-     * @return
-     */
-    private Node addWaiter(Node mode) {
-        Node node = new Node(mode);
-
+    private Node enq(Node node) {
         for (; ; ) {
             Node oldTail = tail;
             if (oldTail != null) {
                 node.setPrevRelaxed(oldTail);
                 if (compareAndSetTail(oldTail, node)) {
                     oldTail.next = node;
-                    return node;
+                    return oldTail;
                 }
             } else {
                 initializeSyncQueue();
@@ -897,81 +886,99 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         }
     }
 
-    private void doAcquireSharedInterruptibly(int arg) throws InterruptedException {
-        final Node node = addWaiter(Node.SHARED);
-        try {
-            for (; ; ) {
-                final Node p = node.predecessor();
-                if (p == head) {
-                    int r = tryAcquireShared(arg);
-                    if (r >= 0) {
-                        setHeadAndPropagate(node, r);
-                        p.next = null; // help GC
-                        return;
-                    }
-                }
-                if (shouldParkAfterFailedAcquire(p, node) && parkAndCheckInterrupt())
-                    throw new InterruptedException();
-            }
-        } catch (Throwable t) {
-            cancelAcquire(node);
-            throw t;
+    private void setHead(Node node) {
+        head = node;
+        node.thread = null;
+        node.prev = null;
+    }
+
+    private void unparkSuccessor(Node node) {
+        int ws = node.waitStatus;
+        if (ws < 0)
+            node.compareAndSetWaitStatus(ws, 0);
+
+        Node s = node.next;
+        if (s == null || s.waitStatus > 0) {
+            s = null;
+            for (Node p = tail; p != node && p != null; p = p.prev)
+                if (p.waitStatus <= 0)
+                    s = p;
+        }
+        if (s != null)
+            LockSupport.unpark(s.thread);
+    }
+
+    private void setHeadAndPropagate(Node node, int propagate) {
+        Node h = head; // Record old head for check below
+        setHead(node);
+
+        if (propagate > 0 || h == null || h.waitStatus < 0 || (h = head) == null || h.waitStatus < 0) {
+            Node s = node.next;
+            if (s == null || s.isShared())
+                doReleaseShared();
         }
     }
 
-    /**
-     * 释放锁
-     * @date 2022/6/17 21:16
-     * @param arg
-     * @return boolean
-     */
-    public final boolean release(int arg) {
-        if (tryRelease(arg)) {
-            Node h = head;
-            if (h != null && h.waitStatus != 0)
-                // 唤醒阻塞队列上的第一个
-                unparkSuccessor(h);
+    protected boolean isHeldExclusively() {
+        throw new UnsupportedOperationException();
+    }
+
+    // Utilities for various versions of acquire
+
+    private void cancelAcquire(Node node) {
+        // Ignore if node doesn't exist
+        if (node == null)
+            return;
+
+        node.thread = null;
+
+        // Skip cancelled predecessors
+        Node pred = node.prev;
+        while (pred.waitStatus > 0)
+            node.prev = pred = pred.prev;
+
+        Node predNext = pred.next;
+
+        node.waitStatus = Node.CANCELLED;
+
+        // If we are the tail, remove ourselves.
+        if (node == tail && compareAndSetTail(node, pred)) {
+            pred.compareAndSetNext(predNext, null);
+        } else {
+            // If successor needs signal, try to set pred's next-link
+            // so it will get one. Otherwise wake it up to propagate.
+            int ws;
+            if (pred != head && ((ws = pred.waitStatus) == Node.SIGNAL || (ws <= 0 && pred.compareAndSetWaitStatus(ws, Node.SIGNAL))) &&
+                pred.thread != null) {
+                Node next = node.next;
+                if (next != null && next.waitStatus <= 0)
+                    pred.compareAndSetNext(predNext, next);
+            } else {
+                unparkSuccessor(node);
+            }
+
+            node.next = node; // help GC
+        }
+    }
+
+    private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+        int ws = pred.waitStatus;
+        if (ws == Node.SIGNAL)
             return true;
+        if (ws > 0) {
+            do {
+                node.prev = pred = pred.prev;
+            } while (pred.waitStatus > 0);
+            pred.next = node;
+        } else {
+            pred.compareAndSetWaitStatus(ws, Node.SIGNAL);
         }
         return false;
     }
 
-    /**
-     *  AQS的模板方法
-     * @author liuzhen
-     * @date 2022/4/16 17:52
-     * @param arg
-     * @return boolean
-     */
-    public final boolean releaseShared(int arg) {
-        // 由CountDownLatch.Sync实现
-        if (tryReleaseShared(arg)) {
-            doReleaseShared();
-            return true;
-        }
-        return false;
+    static void selfInterrupt() {
+        Thread.currentThread().interrupt();
     }
-
-    private void doReleaseShared() {
-        for (; ; ) {
-            Node h = head;
-            if (h != null && h != tail) {
-                int ws = h.waitStatus;
-                if (ws == Node.SIGNAL) {
-                    if (!h.compareAndSetWaitStatus(Node.SIGNAL, 0))
-                        continue;            // loop to recheck cases
-                    unparkSuccessor(h);
-                } else if (ws == 0 && !h.compareAndSetWaitStatus(0, Node.PROPAGATE))
-                    continue;                // loop on failed CAS
-            }
-            if (h == head)                   // loop if head changed
-                break;
-        }
-    }
-
-    // ================================================================>
-
-    // Queue inspection methods
 
     public final boolean hasQueuedThreads() {
         for (Node p = tail, h = head; p != h && p != null; p = p.prev)

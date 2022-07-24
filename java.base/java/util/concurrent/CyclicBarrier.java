@@ -43,12 +43,32 @@ import java.util.concurrent.locks.ReentrantLock;
  * 使用场景：10个工程师一起来公司应聘，招聘方式分为笔试和面试。首先，要等人到齐后，开始笔试；
  * 笔试结束之后，再一起参加面试。把10个人看作10个线程，10个线程之间的同步过程
  *
- * 实现原理：CyclicBarrier基于ReentrantLock+Condition实现。
+ * 实现原理：CyclicBarrier基于 ReentrantLock + Condition 实现。
+ *
+ * 关于上面的方法，有几点说明：
+ * 1. CyclicBarrier是可以被重用的。以上一节的应聘场景为例，来了10个线程，这10个线程互相等待，到齐后一起被唤醒，各自执行接下来的逻辑；
+ *  然后，这10个线程继续互相等待，到齐后再一起被唤醒。每一轮被称为一个Generation，就是一次同步点。
+ * 2. CyclicBarrier 会响应中断。10 个线程没有到齐，如果有线程收到了中断信号，所有阻塞的线程也会被唤醒，就是上面的breakBarrier()方法。
+ *  然后count被重置为初始值（parties），重新开始。
+ * 3. 上面的回调方法，barrierAction只会被第10个线程执行1次（在唤醒其他9个线程之前），而不是10个线程每个都执行1次。
  * @author liuzhen
  * @date 2022/4/16 17:57
  * @return
  */
 public class CyclicBarrier {
+    /**  */
+    private final ReentrantLock lock = new ReentrantLock();
+    /** 用于线程之间相互唤醒 */
+    private final Condition trip = lock.newCondition();
+
+    /** 需要被执行线程run方法 */
+    private final Runnable barrierCommand;
+    private Generation generation = new Generation();
+    /** 线程总数 */
+    private final int parties;
+    /** 当前剩余需要被释放的线程数 */
+    private int count;
+
     private static class Generation {
         Generation() {
         }                 // prevent access constructor creation
@@ -56,35 +76,8 @@ public class CyclicBarrier {
         boolean broken;                 // initially false
     }
 
-    private final ReentrantLock lock = new ReentrantLock();
-    /** 用于线程之间相互唤醒 */
-    private final Condition trip = lock.newCondition();
-    /** 线程总数 */
-    private final int parties;
-    private final Runnable barrierCommand;
-    private Generation generation = new Generation();
-
-    private int count;
-
-    private void nextGeneration() {
-        // signal completion of last generation
-        trip.signalAll();
-        // set up next generation
-        count = parties;
-        generation = new Generation();
-    }
-
     /**
-     *
-     */
-    private void breakBarrier() {
-        generation.broken = true;
-        count = parties;
-        trip.signalAll();
-    }
-
-    /**
-     *
+     * 构造方法
      * @author liuzhen
      * @date 2022/4/16 17:59
      * @param parties
@@ -94,6 +87,7 @@ public class CyclicBarrier {
     public CyclicBarrier(int parties, Runnable barrierAction) {
         if (parties <= 0)
             throw new IllegalArgumentException();
+
         // 参与方数量
         this.parties = parties;
         this.count = parties;
@@ -103,10 +97,6 @@ public class CyclicBarrier {
 
     public CyclicBarrier(int parties) {
         this(parties, null);
-    }
-
-    public int getParties() {
-        return parties;
     }
 
     /**
@@ -164,8 +154,10 @@ public class CyclicBarrier {
                 boolean ranAction = false;
                 try {
                     final Runnable command = barrierCommand;
-                    if (command != null)
+                    if (command != null) {
                         command.run();
+                    }
+
                     ranAction = true;
                     nextGeneration();
                     return 0;
@@ -239,5 +231,26 @@ public class CyclicBarrier {
         } finally {
             lock.unlock();
         }
+    }
+
+    public int getParties() {
+        return parties;
+    }
+
+    private void nextGeneration() {
+        // signal completion of last generation
+        trip.signalAll();
+        // set up next generation
+        count = parties;
+        generation = new Generation();
+    }
+
+    /**
+     *
+     */
+    private void breakBarrier() {
+        generation.broken = true;
+        count = parties;
+        trip.signalAll();
     }
 }

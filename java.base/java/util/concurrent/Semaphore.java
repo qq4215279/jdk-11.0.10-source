@@ -156,26 +156,36 @@ public class Semaphore implements java.io.Serializable {
         sync = fair ? new FairSync(permits) : new NonfairSync(permits);
     }
 
+    /**
+     * 获取资源
+     * @date 2022/7/23 23:52
+     * @param
+     * @return void
+     */
     public void acquire() throws InterruptedException {
         sync.acquireSharedInterruptibly(1);
+    }
+
+    public void acquire(int permits) throws InterruptedException {
+        if (permits < 0)
+            throw new IllegalArgumentException();
+        sync.acquireSharedInterruptibly(permits);
     }
 
     public void acquireUninterruptibly() {
         sync.acquireShared(1);
     }
 
-    public boolean tryAcquire() {
-        return sync.nonfairTryAcquireShared(1) >= 0;
-    }
-
-    public boolean tryAcquire(long timeout, TimeUnit unit) throws InterruptedException {
-        return sync.tryAcquireSharedNanos(1, unit.toNanos(timeout));
+    public void acquireUninterruptibly(int permits) {
+        if (permits < 0)
+            throw new IllegalArgumentException();
+        sync.acquireShared(permits);
     }
 
     /**
      * 释放资源
-     * 由于Semaphore和锁的实现原理基本相同，上面的代码不再展开解释。资源总数即state的初始
-     * 值，在acquire里对state变量进行CAS减操作，减到0之后，线程阻塞；在release里对state变量进行CAS加操作。
+     * 由于Semaphore和锁的实现原理基本相同，上面的代码不再展开解释。资源总数即state的初始值，
+     * 在acquire里对state变量进行CAS减操作，减到0之后，线程阻塞；在release里对state变量进行CAS加操作。
      *
      * @param
      * @return void
@@ -192,22 +202,24 @@ public class Semaphore implements java.io.Serializable {
         sync.releaseShared(permits);
     }
 
-    public void acquire(int permits) throws InterruptedException {
-        if (permits < 0)
-            throw new IllegalArgumentException();
-        sync.acquireSharedInterruptibly(permits);
-    }
-
-    public void acquireUninterruptibly(int permits) {
-        if (permits < 0)
-            throw new IllegalArgumentException();
-        sync.acquireShared(permits);
+    /**
+     * 尝试获取锁
+     * @date 2022/7/23 23:52
+     * @param
+     * @return boolean
+     */
+    public boolean tryAcquire() {
+        return sync.nonfairTryAcquireShared(1) >= 0;
     }
 
     public boolean tryAcquire(int permits) {
         if (permits < 0)
             throw new IllegalArgumentException();
         return sync.nonfairTryAcquireShared(permits) >= 0;
+    }
+
+    public boolean tryAcquire(long timeout, TimeUnit unit) throws InterruptedException {
+        return sync.tryAcquireSharedNanos(1, unit.toNanos(timeout));
     }
 
     public boolean tryAcquire(int permits, long timeout, TimeUnit unit) throws InterruptedException {

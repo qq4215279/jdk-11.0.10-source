@@ -64,16 +64,6 @@ import java.util.concurrent.locks.LockSupport;
  * @return
  */
 public class Phaser {
-
-    /**
-     * 这个64位的state变量被拆成4部分，下图为state变量各部分：
-     * 1: 是否完成同步。最高位0表示未同步完成，1表示同步完成，初始最高位为0。
-     * 31: 轮数
-     * 16: 总线程数
-     * 16: 未到达线程数
-     */
-    private volatile long state;
-
     private static final int MAX_PARTIES = 0xffff;
     private static final int MAX_PHASE = Integer.MAX_VALUE;
     private static final int PARTIES_SHIFT = 16;
@@ -89,147 +79,80 @@ public class Phaser {
     private static final int ONE_DEREGISTER = ONE_ARRIVAL | ONE_PARTY;
     private static final int EMPTY = 1;
 
-    // The following unpacking methods are usually manually inlined
-
-    private static int unarrivedOf(long s) {
-        int counts = (int)s;
-        // 截取地16位
-        return (counts == EMPTY) ? 0 : (counts & UNARRIVED_MASK);
-    }
-
     /**
-     *
-     * @author liuzhen
-     * @date 2022/4/16 18:48
-     * @param s
-     * @return int
+     * 这个64位的state变量被拆成4部分，下图为state变量各部分：
+     * 1: 是否完成同步。最高位0表示未同步完成，1表示同步完成，初始最高位为0。
+     * 31: 轮数
+     * 16: 总线程数
+     * 16: 未到达线程数
      */
-    private static int partiesOf(long s) {
-        // 先把state转为32位int，再右移16位
-        return (int)s >>> PARTIES_SHIFT;
-    }
-
-    private static int phaseOf(long s) {
-        return (int)(s >>> PHASE_SHIFT);
-    }
-
-    private static int arrivedOf(long s) {
-        int counts = (int)s;
-        return (counts == EMPTY) ? 0 : (counts >>> PARTIES_SHIFT) - (counts & UNARRIVED_MASK);
-    }
+    private volatile long state;
 
     private final Phaser parent;
 
     private final Phaser root;
 
+    /** 两个引用表示链表的头部，可以避免线程冲突。（链表的头部指针） */
     private final AtomicReference<QNode> evenQ;
     private final AtomicReference<QNode> oddQ;
 
-    private String badArrive(long s) {
-        return "Attempted arrival of unregistered party for " + stateToString(s);
-    }
+    /**
+     * 在这里，阻塞使用的是一个称为Treiber Stack的数据结构，而不是AQS的双向链表。Treiber Stack是一个无锁的栈，
+     * 它是一个单向链表，出栈、入栈都在链表头部，所以只需要一个head指针，而不需要tail指针，
+     * @date 2022/7/24 0:41
+     */
+    static final class QNode implements ForkJoinPool.ManagedBlocker {
+        final Phaser phaser;
+        final int phase;
+        final boolean interruptible;
+        final boolean timed;
+        boolean wasInterrupted;
+        long nanos;
+        final long deadline;
+        /** 每个Node节点对应一个线程 */
+        volatile Thread thread; // nulled to cancel wait
+        /** 下一个节点的引用 */
+        QNode next;
 
-    private String badRegister(long s) {
-        return "Attempt to register more than " + MAX_PARTIES + " parties for " + stateToString(s);
-    }
+        QNode(Phaser phaser, int phase, boolean interruptible, boolean timed, long nanos) {
+            this.phaser = phaser;
+            this.phase = phase;
+            this.interruptible = interruptible;
+            this.nanos = nanos;
+            this.timed = timed;
+            this.deadline = timed ? System.nanoTime() + nanos : 0L;
+            thread = Thread.currentThread();
+        }
 
-    private int doArrive(int adjust) {
-        final Phaser root = this.root;
-        for (; ; ) {
-            long s = (root == this) ? state : reconcileState();
-            int phase = (int)(s >>> PHASE_SHIFT);
-            if (phase < 0)
-                return phase;
-            int counts = (int)s;
-            int unarrived = (counts == EMPTY) ? 0 : (counts & UNARRIVED_MASK);
-            if (unarrived <= 0)
-                throw new IllegalStateException(badArrive(s));
-            if (STATE.compareAndSet(this, s, s -= adjust)) {
-                if (unarrived == 1) {
-                    long n = s & PARTIES_MASK;  // base of next state
-                    int nextUnarrived = (int)n >>> PARTIES_SHIFT;
-                    if (root == this) {
-                        if (onAdvance(phase, nextUnarrived))
-                            n |= TERMINATION_BIT;
-                        else if (nextUnarrived == 0)
-                            n |= EMPTY;
-                        else
-                            n |= nextUnarrived;
-                        int nextPhase = (phase + 1) & MAX_PHASE;
-                        n |= (long)nextPhase << PHASE_SHIFT;
-                        STATE.compareAndSet(this, s, n);
-                        releaseWaiters(phase);
-                    } else if (nextUnarrived == 0) { // propagate deregistration
-                        phase = parent.doArrive(ONE_DEREGISTER);
-                        STATE.compareAndSet(this, s, s | EMPTY);
-                    } else
-                        phase = parent.doArrive(ONE_ARRIVAL);
-                }
-                return phase;
+        public boolean isReleasable() {
+            if (thread == null)
+                return true;
+            if (phaser.getPhase() != phase) {
+                thread = null;
+                return true;
             }
-        }
-    }
-
-    private int doRegister(int registrations) {
-        // adjustment to state
-        long adjust = ((long)registrations << PARTIES_SHIFT) | registrations;
-        final Phaser parent = this.parent;
-        int phase;
-        for (; ; ) {
-            long s = (parent == null) ? state : reconcileState();
-            int counts = (int)s;
-            int parties = counts >>> PARTIES_SHIFT;
-            int unarrived = counts & UNARRIVED_MASK;
-            if (registrations > MAX_PARTIES - parties)
-                throw new IllegalStateException(badRegister(s));
-            phase = (int)(s >>> PHASE_SHIFT);
-            if (phase < 0)
-                break;
-            if (counts != EMPTY) {                  // not 1st registration
-                if (parent == null || reconcileState() == s) {
-                    if (unarrived == 0)             // wait out advance
-                        root.internalAwaitAdvance(phase, null);
-                    else if (STATE.compareAndSet(this, s, s + adjust))
-                        break;
-                }
-            } else if (parent == null) {              // 1st root registration
-                long next = ((long)phase << PHASE_SHIFT) | adjust;
-                if (STATE.compareAndSet(this, s, next))
-                    break;
-            } else {
-                synchronized (this) {               // 1st sub registration
-                    if (state == s) {               // recheck under lock
-                        phase = parent.doRegister(1);
-                        if (phase < 0)
-                            break;
-                        // finish registration whenever parent registration
-                        // succeeded, even when racing with termination,
-                        // since these are part of the same "transaction".
-                        while (!STATE.weakCompareAndSet(this, s, ((long)phase << PHASE_SHIFT) | adjust)) {
-                            s = state;
-                            phase = (int)(root.state >>> PHASE_SHIFT);
-                            // assert (int)s == EMPTY;
-                        }
-                        break;
-                    }
-                }
+            if (Thread.interrupted())
+                wasInterrupted = true;
+            if (wasInterrupted && interruptible) {
+                thread = null;
+                return true;
             }
+            if (timed && (nanos <= 0L || (nanos = deadline - System.nanoTime()) <= 0L)) {
+                thread = null;
+                return true;
+            }
+            return false;
         }
-        return phase;
-    }
 
-    private long reconcileState() {
-        final Phaser root = this.root;
-        long s = state;
-        if (root != this) {
-            int phase, p;
-            // CAS to root phase with current parties, tripping unarrived
-            while ((phase = (int)(root.state >>> PHASE_SHIFT)) != (int)(s >>> PHASE_SHIFT) && !STATE.weakCompareAndSet(this, s, s = (
-                ((long)phase << PHASE_SHIFT) |
-                ((phase < 0) ? (s & COUNTS_MASK) : (((p = (int)s >>> PARTIES_SHIFT) == 0) ? EMPTY : ((s & PARTIES_MASK) | p))))))
-                s = state;
+        public boolean block() {
+            while (!isReleasable()) {
+                if (timed)
+                    LockSupport.parkNanos(this, nanos);
+                else
+                    LockSupport.park(this);
+            }
+            return true;
         }
-        return s;
     }
 
     public Phaser() {
@@ -311,8 +234,35 @@ public class Phaser {
         return doRegister(parties);
     }
 
+    /**
+     * arrive()和 arriveAndDeregister()内部调用的都是 doArrive(boolean)方法。
+     * 区别在于前者只是把“未达到线程数”减1；后者则把“未到达线程数”和“下一轮的总线程数”都减1。
+     * @date 2022/7/24 0:29
+     * @param
+     * @return int
+     */
     public int arrive() {
         return doArrive(ONE_ARRIVAL);
+    }
+
+    /**
+     *
+     * @date 2022/7/24 0:29
+     * @param phase
+     * @return int
+     */
+    public int awaitAdvance(int phase) {
+        final Phaser root = this.root;
+        // 当只有一个Phaser，没有树状结构时，root就是this
+        long s = (root == this) ? state : reconcileState();
+        int p = (int)(s >>> PHASE_SHIFT);
+        // phase已经结束，无需阻塞，直接返回。
+        if (phase < 0)
+            return phase;
+        if (p == phase)
+            // 阻塞在phase这一轮上
+            return root.internalAwaitAdvance(phase, null);
+        return p;
     }
 
     /**
@@ -326,6 +276,13 @@ public class Phaser {
         return doArrive(ONE_DEREGISTER);
     }
 
+    /**
+     * arrive()与 awaitAdvance(int)的组合
+     * 表示“我自己已到达这个同步点，同时要等待所有人都到达这个同步点，然后再一起前行”。
+     * @date 2022/7/24 0:28
+     * @param
+     * @return int
+     */
     public int arriveAndAwaitAdvance() {
         // Specialization of doArrive+awaitAdvance eliminating some reads/paths
         final Phaser root = this.root;
@@ -359,17 +316,6 @@ public class Phaser {
                 return nextPhase;
             }
         }
-    }
-
-    public int awaitAdvance(int phase) {
-        final Phaser root = this.root;
-        long s = (root == this) ? state : reconcileState();
-        int p = (int)(s >>> PHASE_SHIFT);
-        if (phase < 0)
-            return phase;
-        if (p == phase)
-            return root.internalAwaitAdvance(phase, null);
-        return p;
     }
 
     public int awaitAdvanceInterruptibly(int phase) throws InterruptedException {
@@ -489,12 +435,170 @@ public class Phaser {
         return super.toString() + "[phase = " + phaseOf(s) + " parties = " + partiesOf(s) + " arrived = " + arrivedOf(s) + "]";
     }
 
+    // The following unpacking methods are usually manually inlined
+
+    private static int unarrivedOf(long s) {
+        int counts = (int)s;
+        // 不等于空，则截取低16位
+        return (counts == EMPTY) ? 0 : (counts & UNARRIVED_MASK);
+    }
+
+    /**
+     *
+     * @author liuzhen
+     * @date 2022/4/16 18:48
+     * @param s
+     * @return int
+     */
+    private static int partiesOf(long s) {
+        // 先把state转为32位int，再右移16位
+        return (int)s >>> PARTIES_SHIFT;
+    }
+
+    private static int phaseOf(long s) {
+        return (int)(s >>> PHASE_SHIFT);
+    }
+
+    private static int arrivedOf(long s) {
+        int counts = (int)s;
+        return (counts == EMPTY) ? 0 : (counts >>> PARTIES_SHIFT) - (counts & UNARRIVED_MASK);
+    }
+
+    private String badArrive(long s) {
+        return "Attempted arrival of unregistered party for " + stateToString(s);
+    }
+
+    private String badRegister(long s) {
+        return "Attempt to register more than " + MAX_PARTIES + " parties for " + stateToString(s);
+    }
+
+    /**
+     * 关于下面的方法，有以下几点说明：
+     * 1. 定义了2个常量如下。
+     *  当 deregister=false 时，只最低的16位需要减 1，adj=ONE_ARRIVAL；
+     *  当deregister=true时，低32位中的2个16位都需要减1，adj=ONE_ARRIVAL|ONE_PARTY。
+     * 2. 把未到达线程数减1。减了之后，如果还未到0，什么都不做，直接返回。如果到0，会做2件事情：
+     *  1. 重置state，把state的未到达线程个数重置到总的注册的线程数中，同时phase加 1；
+     *  2. 唤醒队列中的线程。
+     * @date 2022/7/24 0:47
+     * @param adjust
+     * @return int
+     */
+    private int doArrive(int adjust) {
+        final Phaser root = this.root;
+        for (; ; ) {
+            long s = (root == this) ? state : reconcileState();
+            int phase = (int)(s >>> PHASE_SHIFT);
+            if (phase < 0)
+                return phase;
+            int counts = (int)s;
+            int unarrived = (counts == EMPTY) ? 0 : (counts & UNARRIVED_MASK);
+            if (unarrived <= 0)
+                throw new IllegalStateException(badArrive(s));
+            if (STATE.compareAndSet(this, s, s -= adjust)) {
+                if (unarrived == 1) {
+                    long n = s & PARTIES_MASK;  // base of next state
+                    int nextUnarrived = (int)n >>> PARTIES_SHIFT;
+                    if (root == this) {
+                        if (onAdvance(phase, nextUnarrived))
+                            n |= TERMINATION_BIT;
+                        else if (nextUnarrived == 0)
+                            n |= EMPTY;
+                        else
+                            n |= nextUnarrived;
+                        int nextPhase = (phase + 1) & MAX_PHASE;
+                        n |= (long)nextPhase << PHASE_SHIFT;
+                        STATE.compareAndSet(this, s, n);
+                        releaseWaiters(phase);
+                    } else if (nextUnarrived == 0) { // propagate deregistration
+                        phase = parent.doArrive(ONE_DEREGISTER);
+                        STATE.compareAndSet(this, s, s | EMPTY);
+                    } else
+                        phase = parent.doArrive(ONE_ARRIVAL);
+                }
+                return phase;
+            }
+        }
+    }
+
+    private int doRegister(int registrations) {
+        // adjustment to state
+        long adjust = ((long)registrations << PARTIES_SHIFT) | registrations;
+        final Phaser parent = this.parent;
+        int phase;
+        for (; ; ) {
+            long s = (parent == null) ? state : reconcileState();
+            int counts = (int)s;
+            int parties = counts >>> PARTIES_SHIFT;
+            int unarrived = counts & UNARRIVED_MASK;
+            if (registrations > MAX_PARTIES - parties)
+                throw new IllegalStateException(badRegister(s));
+            phase = (int)(s >>> PHASE_SHIFT);
+            if (phase < 0)
+                break;
+            if (counts != EMPTY) {                  // not 1st registration
+                if (parent == null || reconcileState() == s) {
+                    if (unarrived == 0)             // wait out advance
+                        root.internalAwaitAdvance(phase, null);
+                    else if (STATE.compareAndSet(this, s, s + adjust))
+                        break;
+                }
+            } else if (parent == null) {              // 1st root registration
+                long next = ((long)phase << PHASE_SHIFT) | adjust;
+                if (STATE.compareAndSet(this, s, next))
+                    break;
+            } else {
+                synchronized (this) {               // 1st sub registration
+                    if (state == s) {               // recheck under lock
+                        phase = parent.doRegister(1);
+                        if (phase < 0)
+                            break;
+                        // finish registration whenever parent registration
+                        // succeeded, even when racing with termination,
+                        // since these are part of the same "transaction".
+                        while (!STATE.weakCompareAndSet(this, s, ((long)phase << PHASE_SHIFT) | adjust)) {
+                            s = state;
+                            phase = (int)(root.state >>> PHASE_SHIFT);
+                            // assert (int)s == EMPTY;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return phase;
+    }
+
+    private long reconcileState() {
+        final Phaser root = this.root;
+        long s = state;
+        if (root != this) {
+            int phase, p;
+            // CAS to root phase with current parties, tripping unarrived
+            while ((phase = (int)(root.state >>> PHASE_SHIFT)) != (int)(s >>> PHASE_SHIFT) && !STATE.weakCompareAndSet(this, s, s = (
+                ((long)phase << PHASE_SHIFT) |
+                ((phase < 0) ? (s & COUNTS_MASK) : (((p = (int)s >>> PARTIES_SHIFT) == 0) ? EMPTY : ((s & PARTIES_MASK) | p))))))
+                s = state;
+        }
+        return s;
+    }
+
     // Waiting mechanics
 
+    /**
+     * 为了减少并发冲突，这里定义了2个链表，也就是2个Treiber Stack。当phase为奇数轮的时候，
+     * 阻塞线程放在oddQ里面；当phase为偶数轮的时候，阻塞线程放在evenQ里面。
+     * 遍历整个栈，只要栈当中节点的phase不等于当前Phaser的phase，说明该节点不是当前轮的，而是前一轮的，应该被释放并唤醒。
+     * @date 2022/7/24 0:46
+     * @param phase
+     * @return void
+     */
     private void releaseWaiters(int phase) {
         QNode q;   // first element of queue
         Thread t;  // its thread
+        // 根据phase是奇数还是偶数，使用evenQ还是oddQ
         AtomicReference<QNode> head = (phase & 1) == 0 ? evenQ : oddQ;
+        // 遍历栈
         while ((q = head.get()) != null && q.phase != (int)(root.state >>> PHASE_SHIFT)) {
             if (head.compareAndSet(q, q.next) && (t = q.thread) != null) {
                 q.thread = null;
@@ -522,6 +626,15 @@ public class Phaser {
 
     static final int SPINS_PER_ARRIVAL = (NCPU < 2) ? 1 : 1 << 8;
 
+    /**
+     * 下面调用了ForkJoinPool.managedBlock(ManagedBlocker blocker)方法，目的是把node对应的线程阻塞。
+     * ManagerdBlocker是ForkJoinPool里面的一个接口。
+     * QNode实现了该接口，实现原理还是park()，如下所示。之所以没有直接使用park()/unpark()来实现阻塞、唤醒，
+     * 而是封装了ManagedBlocker这一层，主要是出于使用上的方便考虑。一方面是park()可能被中断唤醒，另一方面是带超时时间的park()，把这二者都封装在一起。
+     * @param phase
+     * @param node
+     * @return
+     */
     private int internalAwaitAdvance(int phase, QNode node) {
         // assert root == this;
         releaseWaiters(phase - 1);          // ensure old queue clean
@@ -530,26 +643,31 @@ public class Phaser {
         int spins = SPINS_PER_ARRIVAL;
         long s;
         int p;
+
+        // 不可中断模式的自旋
         while ((p = (int)((s = state) >>> PHASE_SHIFT)) == phase) {
             if (node == null) {           // spinning in noninterruptible mode
                 int unarrived = (int)s & UNARRIVED_MASK;
                 if (unarrived != lastUnarrived && (lastUnarrived = unarrived) < NCPU)
                     spins += SPINS_PER_ARRIVAL;
                 boolean interrupted = Thread.interrupted();
+                // 自旋结束，建一个节点，之后进入阻 塞
                 if (interrupted || --spins < 0) { // need node to record intr
                     node = new QNode(this, phase, false, false, 0L);
                     node.wasInterrupted = interrupted;
                 } else
                     Thread.onSpinWait();
-            } else if (node.isReleasable()) // done or aborted
+            } else if (node.isReleasable()) // 从阻塞唤醒，退出while循环
                 break;
             else if (!queued) {           // push onto queue
                 AtomicReference<QNode> head = (phase & 1) == 0 ? evenQ : oddQ;
                 QNode q = node.next = head.get();
                 if ((q == null || q.phase == phase) && (int)(state >>> PHASE_SHIFT) == phase) // avoid stale enq
+                    // 节点入栈
                     queued = head.compareAndSet(q, node);
             } else {
                 try {
+                    // 调用node.block()阻塞
                     ForkJoinPool.managedBlock(node);
                 } catch (InterruptedException cantHappen) {
                     node.wasInterrupted = true;
@@ -567,58 +685,6 @@ public class Phaser {
         }
         releaseWaiters(phase);
         return p;
-    }
-
-    static final class QNode implements ForkJoinPool.ManagedBlocker {
-        final Phaser phaser;
-        final int phase;
-        final boolean interruptible;
-        final boolean timed;
-        boolean wasInterrupted;
-        long nanos;
-        final long deadline;
-        volatile Thread thread; // nulled to cancel wait
-        QNode next;
-
-        QNode(Phaser phaser, int phase, boolean interruptible, boolean timed, long nanos) {
-            this.phaser = phaser;
-            this.phase = phase;
-            this.interruptible = interruptible;
-            this.nanos = nanos;
-            this.timed = timed;
-            this.deadline = timed ? System.nanoTime() + nanos : 0L;
-            thread = Thread.currentThread();
-        }
-
-        public boolean isReleasable() {
-            if (thread == null)
-                return true;
-            if (phaser.getPhase() != phase) {
-                thread = null;
-                return true;
-            }
-            if (Thread.interrupted())
-                wasInterrupted = true;
-            if (wasInterrupted && interruptible) {
-                thread = null;
-                return true;
-            }
-            if (timed && (nanos <= 0L || (nanos = deadline - System.nanoTime()) <= 0L)) {
-                thread = null;
-                return true;
-            }
-            return false;
-        }
-
-        public boolean block() {
-            while (!isReleasable()) {
-                if (timed)
-                    LockSupport.parkNanos(this, nanos);
-                else
-                    LockSupport.park(this);
-            }
-            return true;
-        }
     }
 
     // VarHandle mechanics
