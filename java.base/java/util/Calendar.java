@@ -62,6 +62,7 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
 
     public static final int ERA = 0;
 
+    // Field字段常量  start ------------------------------------------>
     /** 年 */
     public static final int YEAR = 1;
     /** 月 注意：从0开始算起，最大11；0代表1月，11代表12月） */
@@ -98,6 +99,8 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
     public static final int DST_OFFSET = 16;
 
     public static final int FIELD_COUNT = 17;
+
+    // Field字段常量  end ------------------------------------------>
 
     // ===================== 星期开始 =========================>
     /** 星期一 */
@@ -242,253 +245,6 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
     static final int ZONE_OFFSET_MASK = (1 << ZONE_OFFSET);
     static final int DST_OFFSET_MASK = (1 << DST_OFFSET);
 
-    public static class Builder {
-        private static final int NFIELDS = FIELD_COUNT + 1; // +1 for WEEK_YEAR
-        private static final int WEEK_YEAR = FIELD_COUNT;
-
-        private long instant;
-        // Calendar.stamp[] (lower half) and Calendar.fields[] (upper half) combined
-        private int[] fields;
-        // Pseudo timestamp starting from MINIMUM_USER_STAMP.
-        // (COMPUTED is used to indicate that the instant has been set.)
-        private int nextStamp;
-        // maxFieldIndex keeps the max index of fields which have been set.
-        // (WEEK_YEAR is never included.)
-        private int maxFieldIndex;
-        private String type;
-        private TimeZone zone;
-        private boolean lenient = true;
-        private Locale locale;
-        private int firstDayOfWeek, minimalDaysInFirstWeek;
-
-        public Builder() {}
-
-        public Builder setInstant(long instant) {
-            if (fields != null) {
-                throw new IllegalStateException();
-            }
-            this.instant = instant;
-            nextStamp = COMPUTED;
-            return this;
-        }
-
-        public Builder setInstant(Date instant) {
-            return setInstant(instant.getTime()); // NPE if instant == null
-        }
-
-        public Builder set(int field, int value) {
-            // Note: WEEK_YEAR can't be set with this method.
-            if (field < 0 || field >= FIELD_COUNT) {
-                throw new IllegalArgumentException("field is invalid");
-            }
-            if (isInstantSet()) {
-                throw new IllegalStateException("instant has been set");
-            }
-            allocateFields();
-            internalSet(field, value);
-            return this;
-        }
-
-        public Builder setFields(int... fieldValuePairs) {
-            int len = fieldValuePairs.length;
-            if ((len % 2) != 0) {
-                throw new IllegalArgumentException();
-            }
-            if (isInstantSet()) {
-                throw new IllegalStateException("instant has been set");
-            }
-            if ((nextStamp + len / 2) < 0) {
-                throw new IllegalStateException("stamp counter overflow");
-            }
-            allocateFields();
-            for (int i = 0; i < len;) {
-                int field = fieldValuePairs[i++];
-                // Note: WEEK_YEAR can't be set with this method.
-                if (field < 0 || field >= FIELD_COUNT) {
-                    throw new IllegalArgumentException("field is invalid");
-                }
-                internalSet(field, fieldValuePairs[i++]);
-            }
-            return this;
-        }
-
-        public Builder setDate(int year, int month, int dayOfMonth) {
-            return setFields(YEAR, year, MONTH, month, DAY_OF_MONTH, dayOfMonth);
-        }
-
-        public Builder setTimeOfDay(int hourOfDay, int minute, int second) {
-            return setTimeOfDay(hourOfDay, minute, second, 0);
-        }
-
-        public Builder setTimeOfDay(int hourOfDay, int minute, int second, int millis) {
-            return setFields(HOUR_OF_DAY, hourOfDay, MINUTE, minute, SECOND, second, MILLISECOND, millis);
-        }
-
-        public Builder setWeekDate(int weekYear, int weekOfYear, int dayOfWeek) {
-            allocateFields();
-            internalSet(WEEK_YEAR, weekYear);
-            internalSet(WEEK_OF_YEAR, weekOfYear);
-            internalSet(DAY_OF_WEEK, dayOfWeek);
-            return this;
-        }
-
-        public Builder setTimeZone(TimeZone zone) {
-            if (zone == null) {
-                throw new NullPointerException();
-            }
-            this.zone = zone;
-            return this;
-        }
-
-        public Builder setLenient(boolean lenient) {
-            this.lenient = lenient;
-            return this;
-        }
-
-        public Builder setCalendarType(String type) {
-            if (type.equals("gregorian")) { // NPE if type == null
-                type = "gregory";
-            }
-            if (!Calendar.getAvailableCalendarTypes().contains(type) && !type.equals("iso8601")) {
-                throw new IllegalArgumentException("unknown calendar type: " + type);
-            }
-            if (this.type == null) {
-                this.type = type;
-            } else {
-                if (!this.type.equals(type)) {
-                    throw new IllegalStateException("calendar type override");
-                }
-            }
-            return this;
-        }
-
-        public Builder setLocale(Locale locale) {
-            if (locale == null) {
-                throw new NullPointerException();
-            }
-            this.locale = locale;
-            return this;
-        }
-
-        public Builder setWeekDefinition(int firstDayOfWeek, int minimalDaysInFirstWeek) {
-            if (!isValidWeekParameter(firstDayOfWeek) || !isValidWeekParameter(minimalDaysInFirstWeek)) {
-                throw new IllegalArgumentException();
-            }
-            this.firstDayOfWeek = firstDayOfWeek;
-            this.minimalDaysInFirstWeek = minimalDaysInFirstWeek;
-            return this;
-        }
-
-        public Calendar build() {
-            if (locale == null) {
-                locale = Locale.getDefault();
-            }
-            if (zone == null) {
-                zone = defaultTimeZone(locale);
-            }
-            Calendar cal;
-            if (type == null) {
-                type = locale.getUnicodeLocaleType("ca");
-            }
-            if (type == null) {
-                if (locale.getCountry() == "TH" && locale.getLanguage() == "th") {
-                    type = "buddhist";
-                } else {
-                    type = "gregory";
-                }
-            }
-            switch (type) {
-                case "gregory":
-                    cal = new GregorianCalendar(zone, locale, true);
-                    break;
-                case "iso8601":
-                    GregorianCalendar gcal = new GregorianCalendar(zone, locale, true);
-                    // make gcal a proleptic Gregorian
-                    gcal.setGregorianChange(new Date(Long.MIN_VALUE));
-                    // and week definition to be compatible with ISO 8601
-                    setWeekDefinition(MONDAY, 4);
-                    cal = gcal;
-                    break;
-                case "buddhist":
-                    cal = new BuddhistCalendar(zone, locale);
-                    cal.clear();
-                    break;
-                case "japanese":
-                    cal = new JapaneseImperialCalendar(zone, locale, true);
-                    break;
-                default:
-                    throw new IllegalArgumentException("unknown calendar type: " + type);
-            }
-            cal.setLenient(lenient);
-            if (firstDayOfWeek != 0) {
-                cal.setFirstDayOfWeek(firstDayOfWeek);
-                cal.setMinimalDaysInFirstWeek(minimalDaysInFirstWeek);
-            }
-            if (isInstantSet()) {
-                cal.setTimeInMillis(instant);
-                cal.complete();
-                return cal;
-            }
-
-            if (fields != null) {
-                boolean weekDate = isSet(WEEK_YEAR) && fields[WEEK_YEAR] > fields[YEAR];
-                if (weekDate && !cal.isWeekDateSupported()) {
-                    throw new IllegalArgumentException("week date is unsupported by " + type);
-                }
-
-                // Set the fields from the min stamp to the max stamp so that
-                // the fields resolution works in the Calendar.
-                for (int stamp = MINIMUM_USER_STAMP; stamp < nextStamp; stamp++) {
-                    for (int index = 0; index <= maxFieldIndex; index++) {
-                        if (fields[index] == stamp) {
-                            cal.set(index, fields[NFIELDS + index]);
-                            break;
-                        }
-                    }
-                }
-
-                if (weekDate) {
-                    int weekOfYear = isSet(WEEK_OF_YEAR) ? fields[NFIELDS + WEEK_OF_YEAR] : 1;
-                    int dayOfWeek = isSet(DAY_OF_WEEK) ? fields[NFIELDS + DAY_OF_WEEK] : cal.getFirstDayOfWeek();
-                    cal.setWeekDate(fields[NFIELDS + WEEK_YEAR], weekOfYear, dayOfWeek);
-                }
-                cal.complete();
-            }
-
-            return cal;
-        }
-
-        private void allocateFields() {
-            if (fields == null) {
-                fields = new int[NFIELDS * 2];
-                nextStamp = MINIMUM_USER_STAMP;
-                maxFieldIndex = -1;
-            }
-        }
-
-        private void internalSet(int field, int value) {
-            fields[field] = nextStamp++;
-            if (nextStamp < 0) {
-                throw new IllegalStateException("stamp counter overflow");
-            }
-            fields[NFIELDS + field] = value;
-            if (field > maxFieldIndex && field < WEEK_YEAR) {
-                maxFieldIndex = field;
-            }
-        }
-
-        private boolean isInstantSet() {
-            return nextStamp == COMPUTED;
-        }
-
-        private boolean isSet(int index) {
-            return fields != null && fields[index] > UNSET;
-        }
-
-        private boolean isValidWeekParameter(int value) {
-            return value > 0 && value <= 7;
-        }
-    }
 
     protected Calendar() {
         this(TimeZone.getDefaultRef(), Locale.getDefault(Locale.Category.FORMAT));
@@ -504,6 +260,13 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         setWeekCountData(aLocale);
     }
 
+    /**
+     * 获取 Calendar
+     * @author liuzhen
+     * @date 2022/7/26 18:07
+     * @param
+     * @return java.util.Calendar
+     */
     public static Calendar getInstance() {
         Locale aLocale = Locale.getDefault(Locale.Category.FORMAT);
         return createCalendar(defaultTimeZone(aLocale), aLocale);
@@ -588,11 +351,11 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
      */
     protected abstract void computeTime();
 
-    /** 
+    /**
      * 将 UTC 作为毫秒值转换为时间域值。 允许使时间域值与日历设置的新时间同步。
      * 开始不重新计算该时间；为了重新计算时间和域，调用 complete方法。
-     * @date 2022/4/30 18:27 
-     * @param  
+     * @date 2022/4/30 18:27
+     * @param
      * @return void
      */
     protected abstract void computeFields();
@@ -683,6 +446,7 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
             computeFields();
         }
         internalSet(field, value);
+
         isTimeSet = false;
         areFieldsSet = false;
         isSet[field] = true;
@@ -723,10 +487,10 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         set(SECOND, second);
     }
 
-    /** 
+    /**
      * 将所有时间域值清零。
      * @date 2022/4/30 18:14
-     * @param  
+     * @param
      * @return void
      */
     public final void clear() {
@@ -1185,7 +949,7 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         return when instanceof Calendar && compareTo((Calendar)when) < 0;
     }
 
-    /** 
+    /**
      * 比较时间域记录。 等价于比较转换到 UTC 的结果。
      * @date 2022/4/30 18:16
      * @param when  与该 Calendar 比较的 Calendar。
@@ -1200,23 +964,23 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         return compareTo(getMillisOf(anotherCalendar));
     }
 
-    /** 
+    /**
      * 日期的计算功能。 按照日历的规则，将指定 ( 带符号的 ) 数量的时间添加到给定的时间域。
      * 例如，从日历的当前时间减 5 ，可调用：add(Calendar.DATE, -5)。
-     * @date 2022/4/30 18:17 
+     * @date 2022/4/30 18:17
      * @param field 时间域。amount - 添加到该域的日期和时间的数量。
-     * @param amount 
+     * @param amount
      * @return void
      */
     public abstract void add(int field, int amount);
 
-    /** 
+    /**
      * 时间域滚动功能。 在给定的时间域上 ( 向上 / 向下 ) 滚动一个单个的时间单元。
      * 例如，为了将当前日期向上滚动一天，可调用：roll(Calendar.DATE, true)。
      * 当在年或 Calendar.YEAR 域滚动时，年值将在 1 和调用 getMaximum(Calendar.YEAR) 的返回值之间滚动。
      * 当在月或 Calendar.MONTH 域滚动时，其它的域，例如日期，可能会发生冲突需要改变。
      * 例如，将日期 01/31/96 滚动一月结果是 03/02/96。 当在小时域或 Calendar.HOUR_OF_DAY 域滚动，小时值将在范围 0 到 23 之间滚动，它以 0 开始。
-     * @date 2022/4/30 18:17 
+     * @date 2022/4/30 18:17
      * @param field  时间域。
      * @param up 指明指定时间域值向上还是向下滚动。 如果向上滚动用 true ，否则用 false。
      * @return void
@@ -1270,11 +1034,11 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         sharedZone = shared;
     }
 
-    /** 
+    /**
      * 指明对日期／时间的解释是否是宽松的。 在宽松的解释下，一个诸如 "February 942, 1996" 的日期将被看作与1996 年 2 月后的第 941 天等价。
      * 在严格的解释下，这样的日期将引起抛出异常。
-     * @date 2022/4/30 18:20 
-     * @param lenient 
+     * @date 2022/4/30 18:20
+     * @param lenient
      * @return void
      */
     public void setLenient(boolean lenient) {
@@ -1335,9 +1099,9 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         throw new UnsupportedOperationException();
     }
 
-    /** 
+    /**
      * 获得给定时间域最小值。 例如对于格里高里 DAY_OF_MONTH 为 1。
-     * @date 2022/4/30 18:22 
+     * @date 2022/4/30 18:22
      * @param field 给定的时间域。
      * @return int 给定时间域最高的最小值。
      */
@@ -1351,9 +1115,9 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
      */
     public abstract int getMaximum(int field);
 
-    /** 
+    /**
      * 获得给定域变化时的最高的最小值。 否则与 getMinimum() 相同。对格里高里日历没有区别。
-     * @date 2022/4/30 18:23 
+     * @date 2022/4/30 18:23
      * @param field 给定的时间域。
      * @return int 给定时间域最大值。
      */
@@ -1705,5 +1469,253 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
 
     public final Instant toInstant() {
         return Instant.ofEpochMilli(getTimeInMillis());
+    }
+
+    public static class Builder {
+        private static final int NFIELDS = FIELD_COUNT + 1; // +1 for WEEK_YEAR
+        private static final int WEEK_YEAR = FIELD_COUNT;
+
+        private long instant;
+        // Calendar.stamp[] (lower half) and Calendar.fields[] (upper half) combined
+        private int[] fields;
+        // Pseudo timestamp starting from MINIMUM_USER_STAMP.
+        // (COMPUTED is used to indicate that the instant has been set.)
+        private int nextStamp;
+        // maxFieldIndex keeps the max index of fields which have been set.
+        // (WEEK_YEAR is never included.)
+        private int maxFieldIndex;
+        private String type;
+        private TimeZone zone;
+        private boolean lenient = true;
+        private Locale locale;
+        private int firstDayOfWeek, minimalDaysInFirstWeek;
+
+        public Builder() {}
+
+        public Builder setInstant(long instant) {
+            if (fields != null) {
+                throw new IllegalStateException();
+            }
+            this.instant = instant;
+            nextStamp = COMPUTED;
+            return this;
+        }
+
+        public Builder setInstant(Date instant) {
+            return setInstant(instant.getTime()); // NPE if instant == null
+        }
+
+        public Builder set(int field, int value) {
+            // Note: WEEK_YEAR can't be set with this method.
+            if (field < 0 || field >= FIELD_COUNT) {
+                throw new IllegalArgumentException("field is invalid");
+            }
+            if (isInstantSet()) {
+                throw new IllegalStateException("instant has been set");
+            }
+            allocateFields();
+            internalSet(field, value);
+            return this;
+        }
+
+        public Builder setFields(int... fieldValuePairs) {
+            int len = fieldValuePairs.length;
+            if ((len % 2) != 0) {
+                throw new IllegalArgumentException();
+            }
+            if (isInstantSet()) {
+                throw new IllegalStateException("instant has been set");
+            }
+            if ((nextStamp + len / 2) < 0) {
+                throw new IllegalStateException("stamp counter overflow");
+            }
+            allocateFields();
+            for (int i = 0; i < len;) {
+                int field = fieldValuePairs[i++];
+                // Note: WEEK_YEAR can't be set with this method.
+                if (field < 0 || field >= FIELD_COUNT) {
+                    throw new IllegalArgumentException("field is invalid");
+                }
+                internalSet(field, fieldValuePairs[i++]);
+            }
+            return this;
+        }
+
+        public Builder setDate(int year, int month, int dayOfMonth) {
+            return setFields(YEAR, year, MONTH, month, DAY_OF_MONTH, dayOfMonth);
+        }
+
+        public Builder setTimeOfDay(int hourOfDay, int minute, int second) {
+            return setTimeOfDay(hourOfDay, minute, second, 0);
+        }
+
+        public Builder setTimeOfDay(int hourOfDay, int minute, int second, int millis) {
+            return setFields(HOUR_OF_DAY, hourOfDay, MINUTE, minute, SECOND, second, MILLISECOND, millis);
+        }
+
+        public Builder setWeekDate(int weekYear, int weekOfYear, int dayOfWeek) {
+            allocateFields();
+            internalSet(WEEK_YEAR, weekYear);
+            internalSet(WEEK_OF_YEAR, weekOfYear);
+            internalSet(DAY_OF_WEEK, dayOfWeek);
+            return this;
+        }
+
+        public Builder setTimeZone(TimeZone zone) {
+            if (zone == null) {
+                throw new NullPointerException();
+            }
+            this.zone = zone;
+            return this;
+        }
+
+        public Builder setLenient(boolean lenient) {
+            this.lenient = lenient;
+            return this;
+        }
+
+        public Builder setCalendarType(String type) {
+            if (type.equals("gregorian")) { // NPE if type == null
+                type = "gregory";
+            }
+            if (!Calendar.getAvailableCalendarTypes().contains(type) && !type.equals("iso8601")) {
+                throw new IllegalArgumentException("unknown calendar type: " + type);
+            }
+            if (this.type == null) {
+                this.type = type;
+            } else {
+                if (!this.type.equals(type)) {
+                    throw new IllegalStateException("calendar type override");
+                }
+            }
+            return this;
+        }
+
+        public Builder setLocale(Locale locale) {
+            if (locale == null) {
+                throw new NullPointerException();
+            }
+            this.locale = locale;
+            return this;
+        }
+
+        public Builder setWeekDefinition(int firstDayOfWeek, int minimalDaysInFirstWeek) {
+            if (!isValidWeekParameter(firstDayOfWeek) || !isValidWeekParameter(minimalDaysInFirstWeek)) {
+                throw new IllegalArgumentException();
+            }
+            this.firstDayOfWeek = firstDayOfWeek;
+            this.minimalDaysInFirstWeek = minimalDaysInFirstWeek;
+            return this;
+        }
+
+        public Calendar build() {
+            if (locale == null) {
+                locale = Locale.getDefault();
+            }
+            if (zone == null) {
+                zone = defaultTimeZone(locale);
+            }
+            Calendar cal;
+            if (type == null) {
+                type = locale.getUnicodeLocaleType("ca");
+            }
+            if (type == null) {
+                if (locale.getCountry() == "TH" && locale.getLanguage() == "th") {
+                    type = "buddhist";
+                } else {
+                    type = "gregory";
+                }
+            }
+            switch (type) {
+                case "gregory":
+                    cal = new GregorianCalendar(zone, locale, true);
+                    break;
+                case "iso8601":
+                    GregorianCalendar gcal = new GregorianCalendar(zone, locale, true);
+                    // make gcal a proleptic Gregorian
+                    gcal.setGregorianChange(new Date(Long.MIN_VALUE));
+                    // and week definition to be compatible with ISO 8601
+                    setWeekDefinition(MONDAY, 4);
+                    cal = gcal;
+                    break;
+                case "buddhist":
+                    cal = new BuddhistCalendar(zone, locale);
+                    cal.clear();
+                    break;
+                case "japanese":
+                    cal = new JapaneseImperialCalendar(zone, locale, true);
+                    break;
+                default:
+                    throw new IllegalArgumentException("unknown calendar type: " + type);
+            }
+            cal.setLenient(lenient);
+            if (firstDayOfWeek != 0) {
+                cal.setFirstDayOfWeek(firstDayOfWeek);
+                cal.setMinimalDaysInFirstWeek(minimalDaysInFirstWeek);
+            }
+            if (isInstantSet()) {
+                cal.setTimeInMillis(instant);
+                cal.complete();
+                return cal;
+            }
+
+            if (fields != null) {
+                boolean weekDate = isSet(WEEK_YEAR) && fields[WEEK_YEAR] > fields[YEAR];
+                if (weekDate && !cal.isWeekDateSupported()) {
+                    throw new IllegalArgumentException("week date is unsupported by " + type);
+                }
+
+                // Set the fields from the min stamp to the max stamp so that
+                // the fields resolution works in the Calendar.
+                for (int stamp = MINIMUM_USER_STAMP; stamp < nextStamp; stamp++) {
+                    for (int index = 0; index <= maxFieldIndex; index++) {
+                        if (fields[index] == stamp) {
+                            cal.set(index, fields[NFIELDS + index]);
+                            break;
+                        }
+                    }
+                }
+
+                if (weekDate) {
+                    int weekOfYear = isSet(WEEK_OF_YEAR) ? fields[NFIELDS + WEEK_OF_YEAR] : 1;
+                    int dayOfWeek = isSet(DAY_OF_WEEK) ? fields[NFIELDS + DAY_OF_WEEK] : cal.getFirstDayOfWeek();
+                    cal.setWeekDate(fields[NFIELDS + WEEK_YEAR], weekOfYear, dayOfWeek);
+                }
+                cal.complete();
+            }
+
+            return cal;
+        }
+
+        private void allocateFields() {
+            if (fields == null) {
+                fields = new int[NFIELDS * 2];
+                nextStamp = MINIMUM_USER_STAMP;
+                maxFieldIndex = -1;
+            }
+        }
+
+        private void internalSet(int field, int value) {
+            fields[field] = nextStamp++;
+            if (nextStamp < 0) {
+                throw new IllegalStateException("stamp counter overflow");
+            }
+            fields[NFIELDS + field] = value;
+            if (field > maxFieldIndex && field < WEEK_YEAR) {
+                maxFieldIndex = field;
+            }
+        }
+
+        private boolean isInstantSet() {
+            return nextStamp == COMPUTED;
+        }
+
+        private boolean isSet(int index) {
+            return fields != null && fields[index] > UNSET;
+        }
+
+        private boolean isValidWeekParameter(int value) {
+            return value > 0 && value <= 7;
+        }
     }
 }
