@@ -51,7 +51,7 @@ import java.util.function.Predicate;
 
 /**
  * AQS内部的阻塞队列实现原理：基于双向链表，通过对head/tail进行CAS操作，实现入队和出队。
- * ConcurrentLinkedQueue 的实现原理和AQS 内部的阻塞队列类似：同样是基于 CAS，同样是通过head/tail指针记录队列头部和尾部，但还是有稍许差别：
+ * ConcurrentLinkedQueue 的实现原理和AQS内部的阻塞队列类似：同样是基于 CAS，同样是通过head/tail指针记录队列头部和尾部，但还是有稍许差别：
  * 首先，它是一个单向链表，
  * 其次，在AQS的阻塞队列中，每次入队后，tail一定后移一个位置；每次出队，head一定后移一个位置，以保证head指向队列头部，tail指向链表尾部。
  * 但在ConcurrentLinkedQueue中，head/tail的更新可能落后于节点的入队和出队，因为它不是直接对 head/tail指针进行 CAS操作的，而是对 Node中的 item进行操作。

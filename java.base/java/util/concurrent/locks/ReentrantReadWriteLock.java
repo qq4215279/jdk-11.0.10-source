@@ -17,9 +17,9 @@ import jdk.internal.vm.annotation.ReservedStackAccess;
 public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializable {
     private static final long serialVersionUID = -6992448646407690164L;
 
+    final Sync sync;
     private final ReentrantReadWriteLock.ReadLock readerLock;
     private final ReentrantReadWriteLock.WriteLock writerLock;
-    final Sync sync;
 
     public ReentrantReadWriteLock() {
         this(false);
@@ -95,10 +95,90 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
             return c & EXCLUSIVE_MASK;
         }
 
+        /**
+         * 读线程抢锁的时候是否应该阻塞
+         * @date 2022/7/31 22:39
+         * @param
+         * @return boolean
+         */
         abstract boolean readerShouldBlock();
 
+        /**
+         * 写线程抢锁的时候是否应该阻塞
+         * @date 2022/7/31 22:40
+         * @param
+         * @return boolean
+         */
         abstract boolean writerShouldBlock();
 
+        /**
+         * 尝试获取写锁（排它锁）
+         * @date 2022/7/31 22:33
+         * @param acquires
+         * @return boolean
+         */
+        @ReservedStackAccess
+        protected final boolean tryAcquire(int acquires) {
+            Thread current = Thread.currentThread();
+            int c = getState();
+            // 持有写锁的线程的重入次数
+            int w = exclusiveCount(c);
+            if (c != 0) {
+                // (Note: if c != 0 and w == 0 then shared count != 0)
+                if (w == 0 || current != getExclusiveOwnerThread())
+                    return false;
+                if (w + exclusiveCount(acquires) > MAX_COUNT)
+                    throw new Error("Maximum lock count exceeded");
+                // Reentrant acquire
+                setState(c + acquires);
+                return true;
+            }
+
+            if (writerShouldBlock() || !compareAndSetState(c, c + acquires))
+                return false;
+            setExclusiveOwnerThread(current);
+            return true;
+        }
+
+        /**
+         * 尝试获取读锁（共享锁）
+         * @date 2022/7/31 22:33
+         * @param unused
+         * @return int
+         */
+        @ReservedStackAccess
+        protected final int tryAcquireShared(int unused) {
+            Thread current = Thread.currentThread();
+            int c = getState();
+            if (exclusiveCount(c) != 0 && getExclusiveOwnerThread() != current)
+                return -1;
+            // 持有读锁的线程的重入次数
+            int r = sharedCount(c);
+            if (!readerShouldBlock() && r < MAX_COUNT && compareAndSetState(c, c + SHARED_UNIT)) {
+                if (r == 0) {
+                    firstReader = current;
+                    firstReaderHoldCount = 1;
+                } else if (firstReader == current) {
+                    firstReaderHoldCount++;
+                } else {
+                    HoldCounter rh = cachedHoldCounter;
+                    if (rh == null || rh.tid != LockSupport.getThreadId(current))
+                        cachedHoldCounter = rh = readHolds.get();
+                    else if (rh.count == 0)
+                        readHolds.set(rh);
+                    rh.count++;
+                }
+                return 1;
+            }
+            return fullTryAcquireShared(current);
+        }
+
+        /**
+         * 尝试释放写锁（排它锁）
+         * @date 2022/7/31 22:33
+         * @param releases
+         * @return boolean
+         */
         @ReservedStackAccess
         protected final boolean tryRelease(int releases) {
             if (!isHeldExclusively())
@@ -111,28 +191,8 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
             return free;
         }
 
-        @ReservedStackAccess
-        protected final boolean tryAcquire(int acquires) {
-            Thread current = Thread.currentThread();
-            int c = getState();
-            int w = exclusiveCount(c);
-            if (c != 0) {
-                // (Note: if c != 0 and w == 0 then shared count != 0)
-                if (w == 0 || current != getExclusiveOwnerThread())
-                    return false;
-                if (w + exclusiveCount(acquires) > MAX_COUNT)
-                    throw new Error("Maximum lock count exceeded");
-                // Reentrant acquire
-                setState(c + acquires);
-                return true;
-            }
-            if (writerShouldBlock() || !compareAndSetState(c, c + acquires))
-                return false;
-            setExclusiveOwnerThread(current);
-            return true;
-        }
-
         /**
+         * 尝试释放读锁（共享锁）
          * 因为读锁是共享锁，多个线程会同时持有读锁，所以对读锁的释放不能直接减1，而是需要通过一个for循环+CAS操作不断重试。
          * 这是tryReleaseShared和tryRelease的根本差异所在。
          * @date 2022/6/19 19:39
@@ -164,9 +224,6 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
                 int c = getState();
                 int nextc = c - SHARED_UNIT;
                 if (compareAndSetState(c, nextc))
-                    // Releasing the read lock has no effect on readers,
-                    // but it may allow waiting writers to proceed if
-                    // both read and write locks are now free.
                     return nextc == 0;
             }
         }
@@ -175,39 +232,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
             return new IllegalMonitorStateException("attempt to unlock read lock, not locked by current thread");
         }
 
-        @ReservedStackAccess
-        protected final int tryAcquireShared(int unused) {
-            Thread current = Thread.currentThread();
-            int c = getState();
-            if (exclusiveCount(c) != 0 && getExclusiveOwnerThread() != current)
-                return -1;
-            int r = sharedCount(c);
-            if (!readerShouldBlock() && r < MAX_COUNT && compareAndSetState(c, c + SHARED_UNIT)) {
-                if (r == 0) {
-                    firstReader = current;
-                    firstReaderHoldCount = 1;
-                } else if (firstReader == current) {
-                    firstReaderHoldCount++;
-                } else {
-                    HoldCounter rh = cachedHoldCounter;
-                    if (rh == null || rh.tid != LockSupport.getThreadId(current))
-                        cachedHoldCounter = rh = readHolds.get();
-                    else if (rh.count == 0)
-                        readHolds.set(rh);
-                    rh.count++;
-                }
-                return 1;
-            }
-            return fullTryAcquireShared(current);
-        }
-
         final int fullTryAcquireShared(Thread current) {
-            /*
-             * This code is in part redundant with that in
-             * tryAcquireShared but is simpler overall by not
-             * complicating tryAcquireShared with interactions between
-             * retries and lazily reading hold counts.
-             */
             HoldCounter rh = null;
             for (; ; ) {
                 int c = getState();
@@ -328,8 +353,6 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
         }
 
         protected final boolean isHeldExclusively() {
-            // While we must in general read state before owner,
-            // we don't need to do so to check if current thread is owner
             return getExclusiveOwnerThread() == Thread.currentThread();
         }
 
@@ -521,18 +544,11 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
      */
     public static class WriteLock implements Lock, java.io.Serializable {
         private static final long serialVersionUID = -4992448646407690164L;
+
         private final Sync sync;
 
         protected WriteLock(ReentrantReadWriteLock lock) {
             sync = lock.sync;
-        }
-
-        public void lock() {
-            sync.acquire(1);
-        }
-
-        public void lockInterruptibly() throws InterruptedException {
-            sync.acquireInterruptibly(1);
         }
 
         /**
@@ -547,6 +563,14 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
 
         public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
             return sync.tryAcquireNanos(1, unit.toNanos(timeout));
+        }
+
+        public void lock() {
+            sync.acquire(1);
+        }
+
+        public void lockInterruptibly() throws InterruptedException {
+            sync.acquireInterruptibly(1);
         }
 
         public void unlock() {

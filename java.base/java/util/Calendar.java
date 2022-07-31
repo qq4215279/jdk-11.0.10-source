@@ -1,36 +1,6 @@
 /*
  * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved. ORACLE PROPRIETARY/CONFIDENTIAL. Use is
  * subject to license terms.
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- */
-
-/*
- * (C) Copyright Taligent, Inc. 1996-1998 - All Rights Reserved (C) Copyright IBM Corp. 1996-1998 - All Rights Reserved
- *
- * The original version of this source code and documentation is copyrighted and owned by Taligent, Inc., a wholly-owned
- * subsidiary of IBM. These materials are provided under terms of a License Agreement between Taligent and Sun. This
- * technology is protected by multiple US and International patents. This notice and attribution to Taligent may not be
- * removed. Taligent is a registered trademark of Taligent, Inc.
- *
  */
 
 package java.util;
@@ -81,7 +51,7 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
     public static final int DAY_OF_WEEK = 7;
     /** 某月中第几周。按这个月1号算，1号起就是第1周，8号起就是第2周。 */
     public static final int DAY_OF_WEEK_IN_MONTH = 8;
-    /**  */
+    /** 上午 / 下午 */
     public static final int AM_PM = 9;
     /** 现在几时（12小时制） */
     public static final int HOUR = 10;
@@ -154,6 +124,7 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
     public static final int AM = 0;
     /** 下午（12-24） */
     public static final int PM = 1;
+
     /** getDisplayNames的样式说明符，指示所有样式中的名称，例如“January”和“Jan”。  */
     public static final int ALL_STYLES = 0;
 
@@ -292,6 +263,13 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
             : defaultTZ;
     }
 
+    /**
+     * TODO 原理
+     * @date 2022/7/31 18:17
+     * @param zone
+     * @param aLocale
+     * @return java.util.Calendar
+     */
     private static Calendar createCalendar(TimeZone zone, Locale aLocale) {
         CalendarProvider provider =
             LocaleProviderAdapter.getAdapter(CalendarProvider.class, aLocale).getCalendarProvider();
@@ -322,12 +300,6 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
             }
         }
         if (cal == null) {
-            // If no known calendar type is explicitly specified,
-            // perform the traditional way to create a Calendar:
-            // create a BuddhistCalendar for th_TH locale,
-            // a JapaneseImperialCalendar for ja_JP_JP locale, or
-            // a GregorianCalendar for any other locales.
-            // NOTE: The language, country and variant strings are interned.
             if (aLocale.getLanguage() == "th" && aLocale.getCountry() == "TH") {
                 cal = new BuddhistCalendar(zone, aLocale);
             } else if (aLocale.getVariant() == "JP" && aLocale.getLanguage() == "ja" && aLocale.getCountry() == "JP") {
