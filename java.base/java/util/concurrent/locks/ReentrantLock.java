@@ -50,15 +50,14 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                     setExclusiveOwnerThread(current);
                     return true;
                 }
-            }
-            // 如果state不是0，但是排他线程就是当前线程，则直接设置state的值
-            else if (current == getExclusiveOwnerThread()) {
+            } else if (current == getExclusiveOwnerThread()) { // 如果state不是0，但是排他线程就是当前线程，则直接设置state的值
                 int nextc = c + acquires;
                 if (nextc < 0) // overflow
                     throw new Error("Maximum lock count exceeded");
                 setState(nextc);
                 return true;
             }
+
             // 否则返回false，获取失败
             return false;
         }
@@ -74,6 +73,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             int c = getState() - releases;
             if (Thread.currentThread() != getExclusiveOwnerThread())
                 throw new IllegalMonitorStateException();
+
             boolean free = false;
             if (c == 0) {
                 free = true;
@@ -158,13 +158,12 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             // 则判断“当前线程”是不是CLH队列中的第一个线程线程，
             // 若是的话，则获取该锁，设置锁的状态，并切设置锁的拥有者为“当前线程”。
             if (c == 0) {
+                // 这个 if 就是与非公平锁实现的唯一区别！！！ => 多了这个api：!hasQueuedPredecessors()
                 if (!hasQueuedPredecessors() && compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
                     return true;
                 }
-            }
-            // 如果排他线程就是当前线程，才直接设置state的值
-            else if (current == getExclusiveOwnerThread()) {
+            } else if (current == getExclusiveOwnerThread()) { // 如果排他线程就是当前线程，才直接设置state的值
                 // 如果“独占锁”的拥有者已经为“当前线程”，
                 // 则将更新锁的状态。
                 int nextc = c + acquires;
@@ -173,6 +172,8 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                 setState(nextc);
                 return true;
             }
+
+            // 否则返回false，获取失败
             return false;
         }
     }
@@ -184,6 +185,8 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     public ReentrantLock(boolean fair) {
         sync = fair ? new FairSync() : new NonfairSync();
     }
+
+    // start --------------------------------------------------------------------------->
 
     public boolean tryLock() {
         return sync.nonfairTryAcquire(1);
@@ -209,6 +212,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         return sync.newCondition();
     }
 
+    // end --------------------------------------------------------------------------->
 
     public int getHoldCount() {
         return sync.getHoldCount();

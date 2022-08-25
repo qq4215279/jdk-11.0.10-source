@@ -171,6 +171,7 @@ public final class String implements java.io.Serializable, Comparable<String>, C
         this.coder = ret.coder;
     }
 
+
     public String(byte[] bytes) {
         this(bytes, 0, bytes.length);
     }

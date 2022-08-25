@@ -257,8 +257,8 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
         /**
          * 关于await，有几个关键点要说明：
          * 1. 线程调用 await()的时候，肯定已经先拿到了锁。所以，在 addConditionWaiter()内部，对这个双向链表的操作不需要执行CAS操作，线程天生是安全的
-         * 2. 在线程执行wait操作之前，必须先释放锁。也就是fullyRelease(node)，否则会发生死锁。这个和wait/notify与synchronized的配合机制一样。
-         * 3. 线程从wait中被唤醒后，必须用acquireQueued(node, savedState)方法重新拿锁。
+         * 2. 在线程执行await操作之前，必须先释放锁。也就是fullyRelease(node)，否则会发生死锁。这个和wait/notify与synchronized的配合机制一样。
+         * 3. 线程从await中被唤醒后，必须用acquireQueued(node, savedState)方法重新拿锁。
          * 4. checkInterruptWhileWaiting(node)代码在park(this)代码之后，是为了检测在park期间是否收到过中断信号。
          *  当线程从park中醒来时，有两种可能：一种是其他线程调用了unpark，另一种是收到中断信号。这里的await()方法是可以响应中断的，
          *  所以当发现自己是被中断唤醒的，而不是被unpark唤醒的时，会直接退出while循环，await()方法也会返回。
@@ -674,7 +674,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     /**
-     * addWaiter(...)方法，就是为当前线程生成一个Node，然后把Node放入双向链表的尾部。要注意的是，这只是把Thread对象放入了一个队列中而已，线程本身并未阻塞。
+     * addWaiter(Node mode)方法，就是为当前线程生成一个Node，然后把Node放入双向链表的尾部。要注意的是，这只是把Thread对象放入了一个队列中而已，线程本身并未阻塞。
      * @param mode
      * @return
      */
@@ -1118,9 +1118,6 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     private boolean findNodeFromTail(Node node) {
-        // We check for node first, since it's likely to be at or near tail.
-        // tail is known to be non-null, so we could re-order to "save"
-        // one null check, but we leave it this way to help the VM.
         for (Node p = tail; ; ) {
             if (p == node)
                 return true;
@@ -1131,7 +1128,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     /**
-     *
+     * 将头节点移动到AQS阻塞队列
      * @date 2022/6/17 21:19
      * @param node
      * @return boolean
