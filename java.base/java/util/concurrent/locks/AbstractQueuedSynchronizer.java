@@ -262,7 +262,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
          * 4. checkInterruptWhileWaiting(node)代码在park(this)代码之后，是为了检测在park期间是否收到过中断信号。
          *  当线程从park中醒来时，有两种可能：一种是其他线程调用了unpark，另一种是收到中断信号。这里的await()方法是可以响应中断的，
          *  所以当发现自己是被中断唤醒的，而不是被unpark唤醒的时，会直接退出while循环，await()方法也会返回。
-         * 5. isOnSyncQueue(node)用于判断该Node是否在AQS的同步队列里面。初始的时候，Node只 在Condition的队列里，而不在AQS的队列里。
+         * 5. isOnSyncQueue(node)用于判断该Node是否在AQS的同步队列里面。初始的时候，Node只在Condition的队列里，而不在AQS的队列里。
          *  但执行notity操作的时候，会放进AQS的同步队列。
          * @date 2022/6/17 21:13
          * @param
@@ -494,7 +494,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     // Main exported methods
 
     /**
-     * 尝试获取公平锁
+     * 尝试获取排它锁（写锁）
      * @date 2022/7/13 22:01
      * @param arg
      * @return boolean
@@ -504,7 +504,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     /**
-     * 尝试获取共享锁
+     * 尝试获取共享锁（读锁）
      * @date 2022/7/13 22:01
      * @param arg
      * @return int
@@ -575,7 +575,7 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
 
     /**
-     *
+     * 获取共享锁
      * @date 2022/6/19 19:04
      * @param arg
      * @return void

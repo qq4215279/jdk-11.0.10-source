@@ -112,7 +112,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
         abstract boolean writerShouldBlock();
 
         /**
-         * 尝试获取写锁（排它锁）
+         * 尝试获取排它锁（写锁）
          * @date 2022/7/31 22:33
          * @param acquires
          * @return boolean
@@ -141,7 +141,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
         }
 
         /**
-         * 尝试获取读锁（共享锁）
+         * 尝试获取共享锁（读锁）
          * @date 2022/7/31 22:33
          * @param unused
          * @return int
@@ -193,7 +193,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
 
         /**
          * 尝试释放读锁（共享锁）
-         * 因为读锁是共享锁，多个线程会同时持有读锁，所以对读锁的释放不能直接减1，而是需要通过一个for循环+CAS操作不断重试。
+         * 因为读锁是共享锁，多个线程会同时持有读锁，所以对读锁的释放不能直接减1，而是需要通过一个for循环 + CAS操作不断重试。
          * 这是tryReleaseShared和tryRelease的根本差异所在。
          * @date 2022/6/19 19:39
          * @param unused
