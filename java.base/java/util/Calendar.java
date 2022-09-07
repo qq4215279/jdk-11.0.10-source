@@ -73,19 +73,19 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
     // Field字段常量  end ------------------------------------------>
 
     // ===================== 星期开始 =========================>
-    /** 星期一 */
-    public static final int SUNDAY = 1;
-    /** 星期二 */
-    public static final int MONDAY = 2;
-    /** 星期三 */
-    public static final int TUESDAY = 3;
-    /** 星期四 */
-    public static final int WEDNESDAY = 4;
-    /** 星期五 */
-    public static final int THURSDAY = 5;
-    /** 星期六 */
-    public static final int FRIDAY = 6;
     /** 星期日 */
+    public static final int SUNDAY = 1;
+    /** 星期一 */
+    public static final int MONDAY = 2;
+    /** 星期二 */
+    public static final int TUESDAY = 3;
+    /** 星期三 */
+    public static final int WEDNESDAY = 4;
+    /** 星期四 */
+    public static final int THURSDAY = 5;
+    /** 星期五 */
+    public static final int FRIDAY = 6;
+    /** 星期六 */
     public static final int SATURDAY = 7;
 
     // ===================== 星期结束 =========================>
