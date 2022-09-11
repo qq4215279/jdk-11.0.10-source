@@ -14,6 +14,34 @@ import java.util.function.Supplier;
 
 /**
  * ThreadLocal
+ * ThreadLocal是什么？
+ * 从名字我们就可以看到ThreadLocal叫做线程变量，意思是ThreadLocal中填充的变量属于当前线程，该变量对其他线程而言是隔离的。
+ * ThreadLocal为变量在每个线程中都创建了一个副本，那么每个线程可以访问自己内部的副本变量。
+ *
+ * 使用场景：
+ *  1. 在进行对象跨层传递的时候，使用ThreadLocal可以避免多次传递，打破层次间的约束。
+ *  2. 线程间数据隔离
+ *  3. 进行事务操作，用于存储线程事务信息。
+ *  4. 数据库连接，Session会话管理。
+ *
+ * 总结：
+ *  1. 每个Thread维护着一个ThreadLocalMap的引用
+ *  2. ThreadLocalMap是ThreadLocal的内部类，用Entry来进行存储
+ *  3. ThreadLocal创建的副本是存储在自己的threadLocals中的，也就是自己的ThreadLocalMap。
+ *  4. ThreadLocalMap的键值为ThreadLocal对象，而且可以有多个threadLocal变量，因此保存在map中
+ *  5. 在进行get之前，必须先set，否则会报空指针异常，当然也可以初始化一个，但是必须重写initialValue()方法。
+ *  6. ThreadLocal本身并不存储值，它只是作为一个key来让线程从ThreadLocalMap获取value。
+ *
+ * dream_plan下有张图详细的揭示了ThreadLocal和Thread以及ThreadLocalMap三者的关系。
+ *  1. Thread中有一个map，就是ThreadLocalMap
+ *  2. ThreadLocalMap的key是ThreadLocal，值是我们自己设定的。
+ *  3. ThreadLocal是一个弱引用，当为null时，会被当成垃圾回收
+ *  4. 重点来了，突然我们ThreadLocal是null了，也就是要被垃圾回收器回收了，但是此时我们的ThreadLocalMap生命周期和Thread的一样，它不会回收，
+ *  这时候就出现了一个现象。那就是ThreadLocalMap的key没了，但是value还在，这就造成了内存泄漏。
+ *
+ * 解决办法：使用完ThreadLocal后，执行remove操作，避免出现内存溢出情况。
+ *
+ *
  * @date 2022/7/18 22:52
  */
 public class ThreadLocal<T> {
@@ -27,6 +55,12 @@ public class ThreadLocal<T> {
         return nextHashCode.getAndAdd(HASH_INCREMENT);
     }
 
+    /**
+     * 初始化ThreadLocal的值
+     * @date 2022/9/11 0:15
+     * @param
+     * @return T
+     */
     protected T initialValue() {
         return null;
     }
@@ -37,6 +71,14 @@ public class ThreadLocal<T> {
 
     public ThreadLocal() {}
 
+    /**
+     * 获取ThreadLocal的值
+     * 首先获取当前线程，然后调用getMap方法获取一个ThreadLocalMap，如果map不为null，那就使用当前线程作为ThreadLocalMap的Entry的键，
+     * 然后值就作为相应的的值，如果没有那就设置一个初始值。
+     * @date 2022/9/11 0:01
+     * @param
+     * @return T
+     */
     public T get() {
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
@@ -49,12 +91,6 @@ public class ThreadLocal<T> {
             }
         }
         return setInitialValue();
-    }
-
-    boolean isPresent() {
-        Thread t = Thread.currentThread();
-        ThreadLocalMap map = getMap(t);
-        return map != null && map.getEntry(this) != null;
     }
 
     private T setInitialValue() {
@@ -72,6 +108,14 @@ public class ThreadLocal<T> {
         return value;
     }
 
+    /**
+     * 设置ThreadLocal的值
+     * 首先获取到了当前线程t，然后调用getMap获取ThreadLocalMap，
+     * 如果map存在，则将当前线程对象t作为key，要存储的对象作为value存到map里面去。如果该Map不存在，则初始化一个。
+     * @date 2022/9/11 0:01
+     * @param value
+     * @return void
+     */
     public void set(T value) {
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
@@ -82,6 +126,12 @@ public class ThreadLocal<T> {
         }
     }
 
+    /**
+     * 删除ThreadLocal
+     * @date 2022/9/11 0:01
+     * @param
+     * @return void
+     */
     public void remove() {
         ThreadLocalMap m = getMap(Thread.currentThread());
         if (m != null) {
@@ -89,8 +139,21 @@ public class ThreadLocal<T> {
         }
     }
 
+    /**
+     * 获取线程的ThreadLocalMap
+     * 调用当期线程t，返回当前线程t中的成员变量threadLocals。而threadLocals其实就是ThreadLocalMap。
+     * @date 2022/9/11 0:02
+     * @param t
+     * @return java.lang.ThreadLocal.ThreadLocalMap
+     */
     ThreadLocalMap getMap(Thread t) {
         return t.threadLocals;
+    }
+
+    boolean isPresent() {
+        Thread t = Thread.currentThread();
+        ThreadLocalMap map = getMap(t);
+        return map != null && map.getEntry(this) != null;
     }
 
     void createMap(Thread t, T firstValue) {
@@ -121,6 +184,8 @@ public class ThreadLocal<T> {
 
     /**
      * ThreadLocalMap
+     * ThreadLocalMap其实就是ThreadLocal的一个静态内部类，里面定义了一个Entry来保存数据，而且还是继承的弱引用。
+     * 在Entry内部使用ThreadLocal作为key，使用我们设置的value作为value。
      * @date 2022/7/18 22:52
      */
     static class ThreadLocalMap {
@@ -132,7 +197,10 @@ public class ThreadLocal<T> {
 
         private int threshold; // Default to 0
 
-
+        /**
+         * Entry
+         * @date 2022/9/10 23:59
+         */
         static class Entry extends WeakReference<ThreadLocal<?>> {
             /** The value associated with this ThreadLocal. */
             Object value;

@@ -42,6 +42,12 @@ public interface ExecutorService extends Executor {
      */
     boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
 
+    /**
+     * Callable任务提交
+     * @date 2022/9/9 7:24
+     * @param task
+     * @return java.util.concurrent.Future<T>
+     */
     <T> Future<T> submit(Callable<T> task);
 
     <T> Future<T> submit(Runnable task, T result);
