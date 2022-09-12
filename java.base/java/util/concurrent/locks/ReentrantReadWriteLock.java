@@ -493,20 +493,6 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
          *
          * @date 2022/6/19 19:35
          * @param
-         * @return void
-         */
-        public void lock() {
-            sync.acquireShared(1);
-        }
-
-        public void lockInterruptibly() throws InterruptedException {
-            sync.acquireSharedInterruptibly(1);
-        }
-
-        /**
-         *
-         * @date 2022/6/19 19:35
-         * @param
          * @return boolean
          */
         public boolean tryLock() {
@@ -515,6 +501,20 @@ public class ReentrantReadWriteLock implements ReadWriteLock, java.io.Serializab
 
         public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
             return sync.tryAcquireSharedNanos(1, unit.toNanos(timeout));
+        }
+
+        /**
+         *
+         * @date 2022/6/19 19:35
+         * @param
+         * @return void
+         */
+        public void lock() {
+            sync.acquireShared(1);
+        }
+
+        public void lockInterruptibly() throws InterruptedException {
+            sync.acquireSharedInterruptibly(1);
         }
 
         public void unlock() {
