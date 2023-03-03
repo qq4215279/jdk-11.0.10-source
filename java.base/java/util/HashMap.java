@@ -200,10 +200,6 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             }
         }
 
-        /**
-         * Finds the node starting at root p with the given hash and key. The kc argument caches comparableClassFor(key)
-         * upon first use comparing keys.
-         */
         final TreeNode<K, V> find(int h, Object k, Class<?> kc) {
             TreeNode<K, V> p = this;
             do {
@@ -231,18 +227,10 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             return null;
         }
 
-        /**
-         * Calls find for root node.
-         */
         final TreeNode<K, V> getTreeNode(int h, Object k) {
             return ((parent != null) ? root() : this).find(h, k, null);
         }
 
-        /**
-         * Tie-breaking utility for ordering insertions when equal hashCodes and non-comparable. We don't require a
-         * total order, just a consistent insertion rule to maintain equivalence across rebalancings. Tie-breaking
-         * further than necessary simplifies testing a bit.
-         */
         static int tieBreakOrder(Object a, Object b) {
             int d;
             if (a == null || b == null || (d = a.getClass().getName().compareTo(b.getClass().getName())) == 0)
@@ -250,9 +238,6 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             return d;
         }
 
-        /**
-         * Forms tree of the nodes linked from this node.
-         */
         final void treeify(Node<K, V>[] tab) {
             TreeNode<K, V> root = null;
             for (TreeNode<K, V> x = this, next; x != null; x = next) {
@@ -361,13 +346,6 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             }
         }
 
-        /**
-         * Removes the given node, that must be present before this call. This is messier than typical red-black
-         * deletion code because we cannot swap the contents of an interior node with a leaf successor that is pinned by
-         * "next" pointers that are accessible independently during traversal. So instead we swap the tree linkages. If
-         * the current tree appears to have too few nodes, the bin is converted back to a plain bin. (The test triggers
-         * somewhere between 2 and 6 nodes, depending on tree structure).
-         */
         final void removeTreeNode(HashMap<K, V> map, Node<K, V>[] tab, boolean movable) {
             int n;
             if (tab == null || (n = tab.length) == 0)
@@ -461,15 +439,6 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
                 moveRootToFront(tab, r);
         }
 
-        /**
-         * Splits nodes in a tree bin into lower and upper tree bins, or untreeifies if now too small. Called only from
-         * resize; see above discussion about split bits and indices.
-         *
-         * @param map the map
-         * @param tab the table for recording bin heads
-         * @param index the index of the table being split
-         * @param bit the bit of hash to split on
-         */
         final void split(HashMap<K, V> map, Node<K, V>[] tab, int index, int bit) {
             TreeNode<K, V> b = this;
             // Relink into lo and hi lists, preserving order
@@ -685,9 +654,6 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             }
         }
 
-        /**
-         * Recursive invariant check
-         */
         static <K, V> boolean checkInvariants(TreeNode<K, V> t) {
             TreeNode<K, V> tp = t.parent, tl = t.left, tr = t.right, tb = t.prev, tn = (TreeNode<K, V>)t.next;
             if (tb != null && tb.next != t)
