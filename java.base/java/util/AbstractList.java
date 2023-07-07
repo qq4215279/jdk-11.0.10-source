@@ -96,23 +96,10 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
     }
 
     private class Itr implements Iterator<E> {
-        /**
-         * Index of element to be returned by subsequent call to next.
-         */
         int cursor = 0;
 
-        /**
-         * Index of element returned by most recent call to next or
-         * previous.  Reset to -1 if this element is deleted by a call
-         * to remove.
-         */
         int lastRet = -1;
 
-        /**
-         * The modCount value that the iterator believes that the backing
-         * List should have.  If this expectation is violated, the iterator
-         * has detected concurrent modification.
-         */
         int expectedModCount = modCount;
 
         public boolean hasNext() {
@@ -375,10 +362,6 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
         private final int offset;
         protected int size;
 
-        /**
-         * Constructs a sublist of an arbitrary AbstractList, which is
-         * not a SubList itself.
-         */
         public SubList(AbstractList<E> root, int fromIndex, int toIndex) {
             this.root = root;
             this.parent = null;
@@ -387,9 +370,6 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
             this.modCount = root.modCount;
         }
 
-        /**
-         * Constructs a sublist of another SubList.
-         */
         protected SubList(SubList<E> parent, int fromIndex, int toIndex) {
             this.root = parent.root;
             this.parent = parent;
@@ -539,17 +519,10 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
 
     private static class RandomAccessSubList<E> extends SubList<E> implements RandomAccess {
 
-        /**
-         * Constructs a sublist of an arbitrary AbstractList, which is
-         * not a RandomAccessSubList itself.
-         */
         RandomAccessSubList(AbstractList<E> root, int fromIndex, int toIndex) {
             super(root, fromIndex, toIndex);
         }
 
-        /**
-         * Constructs a sublist of another RandomAccessSubList.
-         */
         RandomAccessSubList(RandomAccessSubList<E> parent, int fromIndex, int toIndex) {
             super(parent, fromIndex, toIndex);
         }

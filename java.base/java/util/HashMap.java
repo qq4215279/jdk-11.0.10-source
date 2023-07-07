@@ -74,7 +74,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
     transient int size;
 
     /**
-     * 调整⼤⼩的下⼀个⼤⼩值（容量*加载因⼦）。capacity * load factor　
+     * 调整⼤⼩的下⼀个⼤⼩值（容量*加载因⼦）。threshold = capacity * loadFactor　
      * 计算公式：capacity * loadFactor。这个值是当前已占⽤数组⻓度的最⼤值。过这个数⽬就重新resize(扩容)，扩容后的 HashMap 容量是之前容量的两倍
      */
     int threshold;
@@ -1006,7 +1006,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         int oldThr = threshold;
         int newCap, newThr = 0;
 
-        // 如果原数组⻓度⼤于0
+        // 第一个if：如果原数组⻓度⼤于0
         if (oldCap > 0) {
             // 数组⼤⼩如果已经⼤于等于最⼤值(2^30)
             if (oldCap >= MAXIMUM_CAPACITY) {
@@ -1025,7 +1025,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
 
-        // 计算新的阀值上限
+        // 第二个if：计算新的阀值上限
         if (newThr == 0) {
             float ft = (float)newCap * loadFactor;
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ? (int)ft : Integer.MAX_VALUE);
@@ -1036,6 +1036,7 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Clone
         Node<K, V>[] newTab = (Node<K, V>[])new Node[newCap];
         table = newTab;
 
+        // 第三个if：扩容后重新分配元素
         if (oldTab != null) {
             // 把每个bucket都移动到新的buckets中
             for (int j = 0; j < oldCap; ++j) {

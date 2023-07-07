@@ -48,6 +48,9 @@ public final class Integer extends Number implements Comparable<Integer> {
     @Native
     public static final int MAX_VALUE = 0x7fffffff;
 
+    /** 值 */
+    private final int value;
+
     public static final Class<Integer> TYPE = (Class<Integer>)Class.getPrimitiveClass("int");
 
     /** 用来表示int二进制补码形式的值的位数 */
@@ -517,8 +520,6 @@ public final class Integer extends Number implements Comparable<Integer> {
     public static Integer valueOf(String s, int radix) throws NumberFormatException {
         return Integer.valueOf(parseInt(s, radix));
     }
-
-    private final int value;
 
     @Deprecated(since = "9")
     public Integer(int value) {
