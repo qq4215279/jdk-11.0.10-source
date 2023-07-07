@@ -141,6 +141,12 @@ public final class Class<T> implements java.io.Serializable, GenericDeclaration,
         }
     }
 
+    /**
+     * 返回与具有给定字符串名称的类或接口关联的类对象
+     * @date 2023/7/6 21:39
+     * @param className
+     * @return java.lang.Class<?>
+     */
     @CallerSensitive
     public static Class<?> forName(String className) throws ClassNotFoundException {
         Class<?> caller = Reflection.getCallerClass();
