@@ -9,7 +9,7 @@ import java.io.*;
 import java.util.*;
 
 /**
- *
+ * 异常类
  * @date 2022/9/10 20:08
  */
 public class Throwable implements Serializable {
@@ -69,10 +69,21 @@ public class Throwable implements Serializable {
             suppressedExceptions = null;
     }
 
-    public synchronized Throwable getCause() {
-        return (cause == this ? null : cause);
-    }
-
+    /**
+     * 用于设置当前异常的根本原因（引起当前异常的原因）。该方法返回当前异常对象，并且只能在异常对象被创建后调用一次，用于将根本原因与当前异常关联起来。
+     * 1. 设置根本原因：
+     *  initCause(Throwable cause) 方法用于将指定的异常对象作为当前异常的根本原因。
+     *  通常在创建一个新的异常对象后，可以通过调用 initCause() 方法来设置其根本原因。
+     * 2. 异常链：
+     *  使用 initCause(Throwable cause) 方法可以创建一个异常链，其中当前异常被指定异常作为根本原因。
+     *  通过异常链，可以追踪异常的起因和路径，以便更好地理解异常发生的上下文和原因。
+     * 3. 循环引用：
+     *  initCause(Throwable cause) 方法不允许创建循环引用，即异常不能引用自身或引用导致自身的异常。
+     *  如果已经设置了异常的根本原因，再次调用 initCause() 方法将抛出 IllegalStateException 异常。
+     * @date 2023/7/13 16:42
+     * @param cause
+     * @return java.lang.Throwable
+     */
     public synchronized Throwable initCause(Throwable cause) {
         if (this.cause != this)
             throw new IllegalStateException("Can't overwrite cause with " + Objects.toString(cause, "a null"), this);
@@ -84,6 +95,16 @@ public class Throwable implements Serializable {
 
     public String getLocalizedMessage() {
         return getMessage();
+    }
+
+    /**
+     * 获取引发当前异常的原因（即根本原因）。该方法返回一个 Throwable 对象，表示引发当前异常的原因，如果没有指定原因，则返回 null。
+     * @date 2023/7/13 15:40
+     * @param
+     * @return java.lang.Throwable
+     */
+    public synchronized Throwable getCause() {
+        return (cause == this ? null : cause);
     }
 
     /**
@@ -225,6 +246,24 @@ public class Throwable implements Serializable {
         }
     }
 
+    /**
+     * 更新异常的堆栈跟踪信息，通常用于异常重新抛出时更新异常的堆栈信息(即新异常的堆栈跟踪信息指向 fillInStackTrace() 方法被调用的地方)。
+     * 该方法返回更新后的异常对象。产生一定的性能开销。
+     *
+     * 特点和使用场景：
+     *  更新堆栈跟踪信息：
+     *      fillInStackTrace() 方法会重新计算和填充异常的堆栈跟踪信息，以反映当前的调用状态。
+     *      默认情况下，异常的堆栈跟踪信息是在抛出异常的地方生成的，但有时可能需要在其他地方重新生成堆栈跟踪信息。
+     *  异常重新抛出：
+     *      在异常被捕获并重新抛出时，通常可以调用 fillInStackTrace() 方法来更新异常的堆栈跟踪信息。
+     *      通过重新填充堆栈跟踪信息，可以获得更准确的异常调用链，便于定位异常的起因和路径。
+     *  性能开销：
+     *      由于 fillInStackTrace() 方法会重新计算堆栈跟踪信息，因此可能会产生一定的性能开销。
+     *      在性能敏感的场景中，需要谨慎使用该方法，以避免不必要的性能损耗。
+     * @date 2023/7/13 16:38
+     * @param
+     * @return java.lang.Throwable
+     */
     public synchronized Throwable fillInStackTrace() {
         if (stackTrace != null || backtrace != null /* Out of protocol state */ ) {
             fillInStackTrace(0);
