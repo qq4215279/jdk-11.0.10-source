@@ -93,10 +93,6 @@ public class Throwable implements Serializable {
         return this;
     }
 
-    public String getLocalizedMessage() {
-        return getMessage();
-    }
-
     /**
      * 获取引发当前异常的原因（即根本原因）。该方法返回一个 Throwable 对象，表示引发当前异常的原因，如果没有指定原因，则返回 null。
      * @date 2023/7/13 15:40
@@ -105,6 +101,10 @@ public class Throwable implements Serializable {
      */
     public synchronized Throwable getCause() {
         return (cause == this ? null : cause);
+    }
+
+    public String getLocalizedMessage() {
+        return getMessage();
     }
 
     /**
@@ -278,6 +278,12 @@ public class Throwable implements Serializable {
         return getOurStackTrace().clone();
     }
 
+    /**
+     * 获取堆栈信息（底层从native api 获得）
+     * @date 2023/8/4 16:18
+     * @param
+     * @return java.lang.StackTraceElement[]
+     */
     private synchronized StackTraceElement[] getOurStackTrace() {
         // Initialize stack trace field with information from
         // backtrace if this is the first call to this method
