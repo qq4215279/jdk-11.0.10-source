@@ -31,6 +31,7 @@
  * @since 9
  */
 module java.instrument {
+    requires java.instrument;
     exports java.lang.instrument;
 
     // allow java launcher to load agents in executable JAR files
