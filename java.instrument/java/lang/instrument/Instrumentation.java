@@ -30,12 +30,10 @@ public interface Instrumentation {
     boolean isModifiableClass(Class<?> theClass);
 
     @SuppressWarnings("rawtypes")
-    Class[]
-    getAllLoadedClasses();
+    Class[] getAllLoadedClasses();
 
     @SuppressWarnings("rawtypes")
-    Class[]
-    getInitiatedClasses(ClassLoader loader);
+    Class[] getInitiatedClasses(ClassLoader loader);
 
     long getObjectSize(Object objectToSize);
 

@@ -32,6 +32,35 @@ public class ScheduledThreadPoolExecutor extends ThreadPoolExecutor implements S
 
     private static final AtomicLong sequencer = new AtomicLong();
 
+    private static final long DEFAULT_KEEPALIVE_MILLIS = 10L;
+
+    public ScheduledThreadPoolExecutor(int corePoolSize) {
+        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue());
+    }
+
+    public ScheduledThreadPoolExecutor(int corePoolSize, ThreadFactory threadFactory) {
+        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue(),
+                threadFactory);
+    }
+
+    public ScheduledThreadPoolExecutor(int corePoolSize, RejectedExecutionHandler handler) {
+        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue(), handler);
+    }
+
+    /**
+     * 构造方法
+     * @param corePoolSize 在线程池中始终维护的核心线程个数
+     * @param threadFactory 线程创建工厂，可以自定义，有默认值
+     * @param handler corePoolSize已满，队列已满，maxPoolSize 已满，最后的拒绝策略。
+     * @return
+     * @date 2023/11/13 10:33
+     */
+    public ScheduledThreadPoolExecutor(int corePoolSize, ThreadFactory threadFactory, RejectedExecutionHandler handler) {
+        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue(),
+                threadFactory, handler);
+    }
+
+
     /**
      *
      * @date 2022/6/20 22:56
@@ -606,27 +635,6 @@ public class ScheduledThreadPoolExecutor extends ThreadPoolExecutor implements S
 
     protected <V> RunnableScheduledFuture<V> decorateTask(Callable<V> callable, RunnableScheduledFuture<V> task) {
         return task;
-    }
-
-    private static final long DEFAULT_KEEPALIVE_MILLIS = 10L;
-
-    public ScheduledThreadPoolExecutor(int corePoolSize) {
-        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue());
-    }
-
-    public ScheduledThreadPoolExecutor(int corePoolSize, ThreadFactory threadFactory) {
-        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue(),
-            threadFactory);
-    }
-
-    public ScheduledThreadPoolExecutor(int corePoolSize, RejectedExecutionHandler handler) {
-        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue(), handler);
-    }
-
-    public ScheduledThreadPoolExecutor(int corePoolSize, ThreadFactory threadFactory,
-        RejectedExecutionHandler handler) {
-        super(corePoolSize, Integer.MAX_VALUE, DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS, new DelayedWorkQueue(),
-            threadFactory, handler);
     }
 
     private long triggerTime(long delay, TimeUnit unit) {

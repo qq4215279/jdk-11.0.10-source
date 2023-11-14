@@ -30,12 +30,12 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     private static final int TIDYING = 2 << COUNT_BITS;
     private static final int TERMINATED = 3 << COUNT_BITS;
 
-    /** 存放任务的阻塞队列 */
-    private final BlockingQueue<Runnable> workQueue;
+
     /** 存放任务的阻塞队列 */
     private final ReentrantLock mainLock = new ReentrantLock();
     /** 线程集合 */
     private final HashSet<Worker> workers = new HashSet<>();
+
 
     private final Condition termination = mainLock.newCondition();
 
@@ -43,26 +43,27 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 
     private long completedTaskCount;
 
-    private volatile ThreadFactory threadFactory;
 
+    /** 存放任务的阻塞队列 */
+    private final BlockingQueue<Runnable> workQueue;
+    /** 核心线程数 */
+    private volatile int corePoolSize;
+    /** 最大线程数 */
+    private volatile int maximumPoolSize;
+    /** 线程存活时间 */
+    private volatile long keepAliveTime;
+    private volatile boolean allowCoreThreadTimeOut;
+    /** 线程创建工厂 */
+    private volatile ThreadFactory threadFactory;
     /** 拒绝处理 */
     private volatile RejectedExecutionHandler handler;
-
-    private volatile long keepAliveTime;
-
-    private volatile boolean allowCoreThreadTimeOut;
-
-    private volatile int corePoolSize;
-
-    private volatile int maximumPoolSize;
-
+    /** 默认拒绝策略 */
     private static final RejectedExecutionHandler defaultHandler = new AbortPolicy();
 
     private static final RuntimePermission shutdownPerm = new RuntimePermission("modifyThread");
 
     /**
      * Worker继承于AQS，也就是说Worker本身就是一把锁。这把锁有什么用处呢？ 好处：用于线程池的关闭、线程执行任务的过程中。
-     * 
      * @date 2022/6/20 20:32
      */
     private final class Worker extends AbstractQueuedSynchronizer implements Runnable {
@@ -173,7 +174,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     /**
      * 构造方法
      * @date 2022/6/20 20:41
-     * @param corePoolSize 在线程池中始终维护的线程个数
+     * @param corePoolSize 在线程池中始终维护的核心线程个数
      * @param maximumPoolSize 在corePooSize已满、队列也满的情况下，扩充线程至此值。
      * @param keepAliveTime maxPoolSize中的空闲线程，销毁所需要的时间，总线程数收缩回corePoolSize。
      * @param unit maxPoolSize中的空闲线程，销毁所需要的时间，总线程数收缩回corePoolSize。
@@ -245,7 +246,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     /** 
      * 尝试终止
      * tryTerminate()不会强行终止线程池，只是做了一下检测：当workerCount为0，workerQueue为空时，先把状态切换到TIDYING，然后调用钩子方法terminated()。
-     * 当钩子方法执行完成时，把状态从TIDYING 改为 TERMINATED，接着调用termination.sinaglAll()，通知前面阻塞在awaitTermination的所有调用者线程。
+     * 当钩子方法执行完成时，把状态从TIDYING 改为 TERMINATED，接着调用termination.singleAll()，通知前面阻塞在awaitTermination的所有调用者线程。
      * 所以，TIDYING和TREMINATED的区别是在二者之间执行了一个钩子方法terminated()，目前是一个空实现。
      * @date 2022/6/20 22:02 
      * @param  

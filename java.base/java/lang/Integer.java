@@ -315,8 +315,8 @@ public final class Integer extends Number implements Comparable<Integer> {
 
             int result = 0;
             // 通过不断循环，将字符串除掉第⼀个字符之后，根据进制不断相乘在相加得到⼀个正整数
-            // ⽐如 parseInt("2abc",16) = 2*16的3次⽅+10*16的2次⽅+11*16+12*1
-            // parseInt("123",10) = 1*10的2次⽅+2*10+3*1
+            // ⽐如 parseInt("2abc",16) = 2*16的3次⽅ + 10*16的2次⽅ + 11*16 + 12*1
+            // parseInt("123",10) = 1*10的2次⽅ + 2*10 + 3*1
             while (i < len) {
                 // Accumulating negatively avoids surprises near MAX_VALUE
                 int digit = Character.digit(s.charAt(i++), radix);
