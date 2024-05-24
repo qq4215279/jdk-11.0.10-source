@@ -33,7 +33,9 @@ public interface Instrumentation {
     void addTransformer(ClassFileTransformer transformer, boolean canRetransform);
 
     /**
-     * 在类加载之前，重新定义 Class 文件，ClassDefinition 表示对一个类新的定义，如果在类加载之后，需要使用 retransformClasses 方法重新定义。addTransformer方法配置之后，后续的类加载都会被Transformer拦截。对于已经加载过的类，可以执行retransformClasses来重新触发这个Transformer的拦截。类加载的字节码被修改后，除非再次被retransform，否则不会恢复。
+     * 在类加载之前，重新定义 Class 文件，ClassDefinition 表示对一个类新的定义，如果在类加载之后，需要使用 retransformClasses 方法重新定义。
+     * addTransformer方法配置之后，后续的类加载都会被Transformer拦截。对于已经加载过的类，可以执行retransformClasses来重新触发这个Transformer的拦截。
+     * 类加载的字节码被修改后，除非再次被retransform，否则不会恢复。
      * @param transformer transformer 
      * @return void
      * @date 2023/11/14 15:32
